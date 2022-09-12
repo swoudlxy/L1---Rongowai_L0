@@ -15,6 +15,9 @@ L0_filename = [path1 'sample_flight_3_with_gps_time_corrected_L0.nc'];
 
 % retrieve L0 data
 time_utc_s = double(ncread(L0_filename,'time_utc_s'));                                      % utc time epoch
+pvt_gps_week = double(ncread(L0_filename,'/science/gps_week'));
+pvt_gps_sec = double(ncread(L0_filename,'/science/gps_seconds'));
+
 %gps_vel_timestamp = double(ncread(L0_filename,'/eng/gps_velocity_time_stamp'));
 %gps_vel_timestamp = gps_vel_timestamp(gps_vel_timestamp>0);
 
@@ -23,10 +26,6 @@ time_utc_s = double(ncread(L0_filename,'time_utc_s'));                          
 %pvt_gps_week = double(ncread(L0_filename,'/science/GPS_week_of_SC_attitude'));
 %pvt_gps_sec = double(ncread(L0_filename,'/science/GPS_second_of_SC_attitude'));
 
-pvt_gps_week = double(ncread(L0_filename,'/science/gps_week'));
-pvt_gps_sec = double(ncread(L0_filename,'/science/gps_seconds'));
-
-%%
 % rx positions in ECEF, metres
 rx_pos_x_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_position_x_ecef_m'));
 rx_pos_y_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_position_y_ecef_m'));
@@ -97,7 +96,7 @@ clc
 
 % define IGS orbits filename (*.sp3)
 % note this path is defined in C++ format
-gps_orbit_filename = '..\\dat\\orbits\\igr21384.sp3';
+gps_orbit_filename = '..\\dat\\orbits\\igr21526.sp3';
 
 % load DTU10, SRTM land DEM, and ocean-land mask (distance to coast)
 dtu_path = '../dat/dtu/';
