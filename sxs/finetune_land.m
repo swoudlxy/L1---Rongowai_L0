@@ -1,4 +1,5 @@
 % This function fine-tunes the SP location over land DEMs
+% multiple peak processing disabled
 % Inputs
 % 1)tx - tx structure, including tx position and velocity
 % 2)rx - rx structure, including rx position, velocity, and rx clock drifts
@@ -10,7 +11,7 @@
 % 1) sx_xyz_final - fine-tuned sp coordinates
 % 2) theta_i - local incidence angle
 
-function [sx_xyz_final,theta_i] = finetune_land(tx,rx,sx_lla_coarse,ddm,dem,L_m,res_m)
+function [sx_xyz_final,theta_i] = finetune_land(tx,rx,sx_lla_coarse,ddm,NZSRTM30,L_m,res_m)
 
 % sparse tx structure
 tx_pos_xyz = tx.tx_pos_xyz;
@@ -19,16 +20,15 @@ tx_vel_xyz = tx.tx_vel_xyz;
 % sparse rx structure
 rx_pos_xyz = rx.rx_pos_xyz;
 rx_vel_xyz = rx.rx_vel_xyz;
-rx_clock_drift = rx.rx_clock_drift_mps;
+rx_clk_drift = rx.rx_clk_drift;
 
 % sparse dem structure
-lat_dem = dem.lat;
-lon_dem = dem.lon;
-ele_dem = dem.ele;
+lat_dem = NZSRTM30.lat;
+lon_dem = NZSRTM30.lon;
+ele_dem = NZSRTM30.ele;
 
 % sparse ddm structure
-% rotate raw_count matrix so row - delay and col - doppler according to CYGNSS
-% need to double check with real Rongowai data
+% rotate raw_count matrix so row is delay and col is doppler
 raw_counts1 = ddm.raw_counts;
 raw_counts = raw_counts1';                      
 
@@ -136,7 +136,7 @@ I = length(delay_peak_bin);                         % number of peaks
 % compute snell angle difference of the searching area
 
 % initialise variables
-add_delay_chip = zeros(L-2);                        % additonal range delay in chips
+add_delay_chips = zeros(L-2);                        % additonal range delay in chips
 doppler_Hz = zeros(L-2);                            % absolute Doppler frequency in Hz
 theta_i_all = zeros(L-2);                           % incidence angle over the searching area
 
@@ -169,7 +169,7 @@ for m = 2:L-1
         % angle difference
         d_snell1 = abs(d_theta1)+abs(d_phi1);
 
-        add_delay_chip(m-1,n-1) = add_delay_chips1;
+        add_delay_chips(m-1,n-1) = add_delay_chips1;
         doppler_Hz(m-1,n-1) = doppler1;
         d_snell_deg(m-1,n-1) = d_snell1;
         theta_i_all(m-1,n-1) = theta_i1;
@@ -203,18 +203,15 @@ for i = 1:I
             doppler1 = doppler_Hz(m,n);
 
             % criteria 1 - minimal delay/chip difference
-            delay_ref1 = delay_dir_chips-add_delay_chips1;  % reference code phase delay for pixel (m,n)
-
-            % adjust estimated phase delay within the range: [0 1023]
-            while delay_ref1 < 0
-                delay_ref1 = delay_ref1+1023;
-            end
+            delay_ref2 = delay_dir_chips-add_delay_chips1;  % reference code phase delay for pixel (m,n)
+            delay_ref1 = delay_correction(delay_ref2);
             
             % delay difference
             d_delay1 = delay_max_chips-delay_ref1;
         
             % criteria 2 - minimal Doppler difference   
-            doppler_clk = rx_clock_drift/c;                 % doppler due to rx drifts
+            c = 299792458;
+            doppler_clk = rx_clk_drift/c;                   % doppler due to rx drifts
             doppler1_adj = doppler1+doppler_clk;            % adjusted Doppler
             
             % doppler difference
@@ -230,7 +227,7 @@ for i = 1:I
     % find pixels meet all three criteria
     % these three criteria are defined based on CYGNSS data, need to be
     % refined for Rongowai
-    index = find(abs(d_add_tau) <= 2.5 & d_doppler_Hz <= 200 & d_snell_deg <= 2);
+    index = find(abs(d_delay_chip) <= 2.5 & d_doppler_Hz <= 200 & d_snell_deg <= 2);
 
     lat_final1 = search_lat_matrix(index);
     lon_final1 = search_lon_matrix(index);

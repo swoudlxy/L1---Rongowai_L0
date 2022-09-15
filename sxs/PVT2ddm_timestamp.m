@@ -29,25 +29,25 @@ rx_clk_bias_m_pvt = rx_clk_pvt(:,1);
 rx_clk_drift_mps_pvt = rx_clk_pvt(:,2);
 
 % linear interpolation all the values at ddm timestamp
-rx_pos_x = interp1(pvt_utc,rx_pos_x_pvt,ddm_utc);
-rx_pos_y = interp1(pvt_utc,rx_pos_y_pvt,ddm_utc);
-rx_pos_z = interp1(pvt_utc,rx_pos_z_pvt,ddm_utc);
+rx_pos_x = interp1(pvt_utc,rx_pos_x_pvt,ddm_utc,'linear','extrap');
+rx_pos_y = interp1(pvt_utc,rx_pos_y_pvt,ddm_utc,'linear','extrap');
+rx_pos_z = interp1(pvt_utc,rx_pos_z_pvt,ddm_utc,'linear','extrap');
 
 rx_pos_xyz = [rx_pos_x,rx_pos_y,rx_pos_z];
 
-rx_vel_x = interp1(pvt_utc,rx_vel_x_pvt,ddm_utc);
-rx_vel_y = interp1(pvt_utc,rx_vel_y_pvt,ddm_utc);
-rx_vel_z = interp1(pvt_utc,rx_vel_z_pvt,ddm_utc);
+rx_vel_x = interp1(pvt_utc,rx_vel_x_pvt,ddm_utc,'linear','extrap');
+rx_vel_y = interp1(pvt_utc,rx_vel_y_pvt,ddm_utc,'linear','extrap');
+rx_vel_z = interp1(pvt_utc,rx_vel_z_pvt,ddm_utc,'linear','extrap');
 
 rx_vel_xyz = [rx_vel_x,rx_vel_y,rx_vel_z];
 
-rx_roll_deg = interp1(pvt_utc,rx_roll_deg_pvt,ddm_utc);
-rx_pitch_deg = interp1(pvt_utc,rx_pitch_deg_pvt,ddm_utc);
-rx_yaw_deg = interp1(pvt_utc,rx_yaw_deg_pvt,ddm_utc);
+rx_roll_deg = interp1(pvt_utc,rx_roll_deg_pvt,ddm_utc,'linear','extrap');
+rx_pitch_deg = interp1(pvt_utc,rx_pitch_deg_pvt,ddm_utc,'linear','extrap');
+rx_yaw_deg = interp1(pvt_utc,rx_yaw_deg_pvt,ddm_utc,'linear','extrap');
 
 rx_attitude = [rx_roll_deg,rx_pitch_deg,rx_yaw_deg];
 
-rx_clk_bias_m = interp1(pvt_utc,rx_clk_bias_m_pvt,ddm_utc);
-rx_clk_drift_mps = interp1(pvt_utc,rx_clk_drift_mps_pvt,ddm_utc);
+rx_clk_bias_m = interp1(pvt_utc,rx_clk_bias_m_pvt,ddm_utc,'linear','extrap');
+rx_clk_drift_mps = interp1(pvt_utc,rx_clk_drift_mps_pvt,ddm_utc,'linear','extrap');
 
 rx_clk = [rx_clk_bias_m,rx_clk_drift_mps];

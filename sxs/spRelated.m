@@ -13,24 +13,30 @@
 % 5) gps_rad: EIRP, tx power
 % 6) rx_rad: LHCP and RHCP antenna gain
 
-function [sp_angle_body,sp_angle_enu,theta_gps,range,gps_rad,rx_rad] = spRelated(tx,rx,sx_pos_xyz,SV_PRN_LUT,SV_eirp_LUT,nadir_pattern)
+function [sp_angle_body,sp_angle_enu,theta_gps,range,gps_rad,rx_rad] = spRelated(tx,rx,sx_pos_xyz,SV_eirp_LUT,nadir_pattern)
 
 % sparse structres
 tx_pos_xyz = tx.tx_pos_xyz;
 tx_vel_xyz = tx.tx_vel_xyz;
-tx_id = tx.tx_id;
+SV = tx.sv_num;
 
 rx_pos_xyz = rx.rx_pos_xyz;
 rx_vel_xyz = rx.rx_vel_xyz;
 rx_att = rx.rx_attitude;
 
-az_deg = nadir_pattern.az_deg;
-el_deg = nadir_pattern.az_deg;
-lhcp_gain_pattern = nadir_pattern.lhcp_gain_db;
-rhcp_gain_pattern = nadir_pattern.rhcp_gain_db;
+%az_deg = nadir_pattern.az_deg;
+%el_deg = nadir_pattern.el_deg;
+
+% define azimuth and elevation angle in the antenna frame
+res = 0.1;                                          % resolution in degrees
+az_deg = 0:res:360; 
+el_deg = 120:-1*res:0;
+
+lhcp_gain_pattern = nadir_pattern.LHCP;
+rhcp_gain_pattern = nadir_pattern.RHCP;
 
 % compute angles
-[theta_gps,~] = ecef2orf(tx_pos_xyz,tx_vel_xyz,sx_pos_xyz1);
+[theta_gps,~] = ecef2orf(tx_pos_xyz,tx_vel_xyz,sx_pos_xyz);
 
 [sp_theta_body,sp_az_body] = ecef2brf(rx_pos_xyz,rx_vel_xyz,sx_pos_xyz,rx_att);
 [sp_theta_enu,sp_az_enu] = ecef2enuf(rx_pos_xyz,sx_pos_xyz);
@@ -45,9 +51,6 @@ R_rsx = norm(sx_pos_xyz-rx_pos_xyz);        % range from rx to sx
 range = [R_tsx R_rsx];
 
 % compute gps radiation properties
-i = SV_PRN_LUT(:,1) == tx_id;
-SV = SV_PRN_LUT(i,2);                       % SV number corresponds to the satellite's PRN
-
 j = SV_eirp_LUT(:,1) == SV;                 % index of SV number in eirp LUT
 
 gps_pow_dbw = SV_eirp_LUT(j,3);             % gps power in dBw

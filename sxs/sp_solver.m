@@ -12,12 +12,12 @@ function [sx_pos_xyz,inc_angle_deg,dis_to_coast_km] = sp_solver(tx,rx,ddm,dtu10,
 
 % retrieve tx and rx position vectors
 tx_pos_xyz = tx.tx_pos_xyz;
-rx_pos_xyz = rx.tx_pos_xyz;
+rx_pos_xyz = rx.rx_pos_xyz;
 
 % sparse dis_to_coast data
 lat_landmask = dist_to_coast_nz.lat;
 lon_landmask = dist_to_coast_nz.lon;
-dist_landmask = dist_to_caost_nz.dist;
+dist_landmask = dist_to_coast_nz.dist;
 
 % step 0 - check if LOS exists
 LOS_flag = los(tx_pos_xyz,rx_pos_xyz);      % LOS flag, 1 = LOS exit
@@ -36,7 +36,7 @@ if LOS_flag == 1
 
     dist = dist_landmask(sx_lat_coarse_ind,sx_lon_coarse_ind);
 
-    % ocean: dist < 0, land: dist >= 0
+    % ocean-land boundary: -25 km
     if dist < -25
         land_flag = 0;                          % raw SP on ocean
 
@@ -66,7 +66,7 @@ if LOS_flag == 1
     end
 
     % step 4 - derive distance to coast in kilometer
-    sx_lla = ecef2lla(sx_pos_syz);
+    sx_lla = ecef2lla(sx_pos_xyz);
     sx_lat = sx_lla(1); [~,sx_lat_index] = min(abs(sx_lat-lat_landmask));
     sx_lon = sx_lla(2); [~,sx_lon_index] = min(abs(sx_lon-lon_landmask));
     
@@ -75,8 +75,8 @@ if LOS_flag == 1
 elseif LOS_flag == 0
 
     %no sx if no LOS between rx and tx
-    sx_pos_xyz = [-999,-999,-999];
-    inc_angle_deg = -999;
-    dis_to_coast_km = -999;
+    sx_pos_xyz = [-9999,-9999,-9999];
+    inc_angle_deg = -9999;
+    dis_to_coast_km = -9999;
 
 end
