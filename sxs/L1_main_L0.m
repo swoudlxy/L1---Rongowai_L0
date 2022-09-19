@@ -132,6 +132,8 @@ non_coherent_integrations = non_coherent_integrations(ddm_range);
 
 add_range_to_sp = add_range_to_sp(:,ddm_range);
 
+wgs84_flag = 1;             % only for bench test data
+
 % Load L0 data ends
 
 %% define external data paths and filenames
@@ -141,22 +143,36 @@ clc
 % note this path is defined in C++ format
 gps_orbit_filename = '..\\dat\\orbits\\igr21526.sp3';
 
-% load DTU10, SRTM land DEM, and ocean-land mask (distance to coast)
+% load SRTM_30 DEM
+dem_path = '../dat/dem/';
+dem_file1 = 'nzsrtm_30_part1_v1.dat';
+dem_file2 = 'nzsrtm_30_part2_v1.dat';
+
+dem1 = get_dem([dem_path dem_file1]);
+dem2 = get_dem([dem_path dem_file2]);
+
+if wgs84_flag == 1
+    dem1.ele = zeros(length(dem1.lat),length(dem1.lon));
+    dem2.ele = zeros(length(dem2.lat),length(dem2.lon));
+end
+
+% load DTU10 model
 dtu_path = '../dat/dtu/';
 dtu_filename = 'dtu10_v1.dat';
 
 dtu10 = get_dtu10([dtu_path dtu_filename]);
 
-dem_path = '../dat/dem/';
-load([dem_path,'NZSRTM30_v1.mat'])
+if wgs84_flag == 1
+    dtu10.ele = zeros(length(dtu10.lat),length(dtu10.lon));
+end
 
-% landmask/dist_to_coast has been updated to .dat format
+% load distance to coast mask
 landmask_path = '../dat/cst/';
 landmask_filename = 'dist_to_coast_nz_v1.dat';
-dist_to_coast_nz = dist_to_coast_mask([landmask_path landmask_filename]);
+
+dist_to_coast_nz = get_dist_to_coast_mask([landmask_path landmask_filename]);
 
 % load PRN-SV and SV-EIRP(static) LUT
-% both LUTs have been converted to .dat format
 gps_path = '../dat/gps/';
 SV_PRN_filename = 'PRN_SV_LUT_v1.dat';
 SV_eirp_filename = 'GPS_SV_EIRP_Params_v7.dat';
@@ -184,12 +200,6 @@ LHCP_pattern.RHCP = LHCP_R_gain_db_i;
 [~,~,RHCP_R_gain_db_i] = get_ant_pattern([rng_path,RHCP_R_filename]);
 RHCP_pattern.LHCP = RHCP_L_gain_db_i;
 RHCP_pattern.RHCP = RHCP_R_gain_db_i;
-
-% define azimuth and elevation angle in the antenna frame
-%res = 0.1;                                          % resolution in degrees
-%azim_deg = 0:res:360; elev_deg = 120:-1*res:0;
-
-% define external data sources ends
 
 %% Part 1: General processing
 % 1 - process timestamps and UTC human time
@@ -447,6 +457,10 @@ sx_pos_x = zeros(J,I)+invalid;
 sx_pos_y = zeros(J,I)+invalid;
 sx_pos_z = zeros(J,I)+invalid;
 
+sx_lat = zeros(J,I)+invalid;
+sx_lon = zeros(J,I)+invalid;
+sx_alt = zeros(J,I)+invalid;
+
 sx_inc_angle = zeros(J,I)+invalid;
 sx_dis_to_coast_km = zeros(J,I)+invalid;
 
@@ -468,7 +482,24 @@ static_gps_eirp = zeros(J,I)+invalid;
 sx_rx_gain = zeros(J,I)+invalid;
 cross_pol = zeros(J,I)+invalid;
 
-for i = 200%1:I
+brcs_ddm_sp_bin_delay_row = zeros(J,I)+invalid;
+brcs_ddm_sp_bin_dopp_col = zeros(J,I)+invalid;
+
+brcs = zeros(5,40,J,I)+invalid;
+eff_scatter = zeros(5,40,J,I)+invalid;
+nbrcs_scatter_area = zeros(J,I)+invalid;
+nbrcs = zeros(J,I)+invalid;
+
+les_scatter_area = zeros(J,I)+invalid;
+ddm_les = zeros(J,I)+invalid;
+
+tes_scatter_area = zeros(J,I)+invalid;
+ddm_tes = zeros(J,I)+invalid;
+
+surface_reflectivity = zeros(5,40,J,I)+invalid;
+surface_reflectivity_peak = zeros(J,I)+invalid;
+
+for i = 400%1:I
 
     % Part 4.0: retrieve variables for L1b processing
     % retrieve per-sample and write to structures
@@ -515,8 +546,9 @@ for i = 200%1:I
         delay_dir_chips1 = delay_correction(delay_dir_chips2,1023);
 
         ddm1.delay_dir_chips = delay_dir_chips1;
+        ddm1.add_range_to_sp = add_range_to_sp_chips1;
 
-        % analog power
+        % analog power from L1a
         power_analog1 = power_analog(:,:,j,i);
 
         % only process these with valid prn code
@@ -526,7 +558,8 @@ for i = 200%1:I
             % derive SP positions, angle of incidence and distance to coast
             % in kilometer
             [sx_pos_xyz1,inc_angle_deg1,dis_to_coast_km1] = sp_solver(tx1,rx1,ddm1, ...
-                dtu10,NZSRTM30,dist_to_coast_nz);
+                dem1,dem2,dtu10,dist_to_coast_nz,wgs84_flag);
+            sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
 
             % define nadir antenna pattern to be used
             % installed antenna orientation angle is not included
@@ -549,18 +582,22 @@ for i = 200%1:I
                 [sx_angle_body1,sx_angle_enu1,theta_gps1,ranges1,gps_rad1,rx_rad1] = spRelated(tx1,rx1, ...
                     sx_pos_xyz1,SV_eirp_LUT,nadir_pattern);
 
+                % get values for deriving BRCS and reflectivity
+                R_tsx1 = ranges1(1);        R_rsx1 = ranges1(2);
+                gps_eirp_watt1 = gps_rad1(3);
+
                 % derive cross polarisation
                 if ddm_ant1 == 2
                     sx_rx_gain1 = rx_rad1(1);
-                    cross_pol1 = rx_rad(1)-rx_rad(2);
+                    cross_pol1 = rx_rad1(1)-rx_rad1(2);
 
                 elseif ddm_ant1 == 3
                     sx_rx_gain1 = rx_rad1(2);
-                    cross_pol1 = rx_rad(2)-rx_rad(1);
+                    cross_pol1 = rx_rad1(2)-rx_rad1(1);
 
                 end
 
-                % save to matrix
+                % save to variables
                 sx_pos_x(j,i) = sx_pos_xyz1(1);
                 sx_pos_y(j,i) = sx_pos_xyz1(2);
                 sx_pos_z(j,i) = sx_pos_xyz1(3);
@@ -579,30 +616,73 @@ for i = 200%1:I
                 tx_to_sp_range(j,i) = ranges1(1);
                 rx_to_sp_range(j,i) = ranges1(2);
 
-                gps_tx_power_db_w(j,i) = gps_rad(1);
-                gps_ant_gain_db_i(j,i) = gps_rad(2);
-                static_gps_eirp(j,i) = gps_rad(3);
+                gps_tx_power_db_w(j,i) = gps_rad1(1);
+                gps_ant_gain_db_i(j,i) = gps_rad1(2);
+                static_gps_eirp(j,i) = gps_rad1(3);
 
-                sx_rx_gain(j,i) = sx_rx_gain1;                  % nadir antenna gain - the main polarisation
+                sx_rx_gain(j,i) = sx_rx_gain1;                  % nadir antenna gain - main polarisation
                 cross_pol(j,i) = cross_pol1;
 
-                % Part 4.2: BRCS, NBRCS, and effective scattering area
+                % Part 4.1 ends
+
+                % Part 4.2: BRCS, NBRCS, and effective scattering area (A_eff)
+                % derive BRCS
+                brcs1 = ddm_brcs(power_analog1,gps_eirp_watt1, ...
+                    sx_rx_gain1,R_tsx1,R_rsx1);
+
+                % retrieve a discretised local surface for deriving A_eff
+                L_local = 6090; res_local = 30;
+                local_dem1 = get_local_dem(sx_pos_lla1,L_local,res_local, ...
+                    dem1,dem2,dtu10,dist_to_coast_nz);
+
+                T_coh = coherent_duration(i);                   % coherent duration
+
+                % derive A_eff,nbrcs,LES and TES
+                [A_eff1,sp_delay_bin_float1,sp_doppler_bin_float1] = ddm_Aeff(tx1,rx1,sx_pos_xyz1, ...
+                    ddm1,local_dem1,T_coh);
+                [nbrcs1,LES1,TES1] = ddm_nbrcs(brcs1,A_eff1,sp_delay_bin_float1,sp_doppler_bin_float1);
+
+                % save to variables
+                brcs_ddm_sp_bin_delay_row(j,i) = sp_delay_bin_float1-1;     % correct to 0-indexed
+                brcs_ddm_sp_bin_dopp_col(j,i) = sp_doppler_bin_float1-1;    % correct to 0-indexed
+
+                brcs(:,:,j,i) = brcs1;
+                eff_scatter(:,:,j,i) = A_eff1;  
+                nbrcs_scatter_area(j,i) = nbrcs1(1);
+                nbrcs = nbrcs1(2);
+
+                les_scatter_area(j,i) = LES1(1);
+                ddm_les(j,i) = LES1(2);
                 
+                tes_scatter_area(j,i) = TES1(1);
+                ddm_tes(j,i) = TES1(2);
 
-
-
-
+                % Part 4.2 ends
+                
                 % Part 4.3: reflectivity and peak reflectivity
-                [refl1,peak_refl1] = ddm_refl(power_analog1,gps_girp_mean,rx_gain_mean, ...
-                    range_tsx_mean,range_rsx_mean);
+                [surf_refl1,surf_refl_peak1] = ddm_refl(power_analog1,gps_eirp_watt1, ...
+                    sx_rx_gain1,R_tsx1,R_rsx1);
+
+                % save to variables
+                surface_reflectivity(:,:,j,i) = surf_refl1;
+                surface_reflectivity_peak(j,i) = surf_refl_peak1;
+
+                % Part 4.3 ends
+
+                % Part 4.4: coherency detector
+
+
+                % Part 4.5: Fresnel-zone solver
+                [fresnel_major1,fresnel_minor1,fresnel_orientation1] = fresnel(tx1,rx1,sx_pos_xyz1,inc_angle_deg1);
 
 
 
 
 
+%}  
             end
 
-            
+    
 
 
         end
@@ -611,163 +691,6 @@ for i = 200%1:I
 end
 
 %{
-
-    % retrieve parameters at each timestamp
-    % product of L1a
-    power_analog1 = L1_postCal(i).power_analog;
-    ddm_snr1 = L1_postCal(i).ddm_snr;
-
-    % transmitter ID, PRN
-    tx_id1 = transmitter_id(i);
-    
-   
-
-    
-    % ddm-related parameters to ddm structure
-    raw_counts2 = raw_counts(:,:,:,i);
-    ddm1.raw_counts = squeeze(raw_counts2);         % remove dimensions = 1
- 
-    ddm1.delay_dir_chips = delay_dir_chips(i);
-    
-    ddm1.delay_bin_res = delay_bin_res(i);
-    ddm1.doppler_bin_res = doppler_bin_res(i);
-
-    ddm1.delay_center_bin = delay_center_bin(i);
-    ddm1.doppler_center_bin = doppler_center_bin(i);
-
-    ddm1.delay_center_chips = delay_center_chips(i);
-    ddm1.doppler_ceneter_Hz = doppler_center_Hz(i);
-
-    ddm1.num_delay_bins = num_delay_bins(i);
-    ddm1.num_doppler_bins = num_doppler_bins(i);
-
-    rf_source1 = rf_source(i);                      % rf3 = LHCP, rf5 = RHCP
-
-    % tx-related parameters to tx structure
-    tx1.tx_pos_xyz = tx_pos_xyz1;
-    tx1.tx_vel_xyz = tx_vel_xyz1;
-    tx1.tx_id = tx_id1;
-
-    % TODO:
-    % rx_clk_bias_rate_pvt does not exist in the current L0
-    % rx_clk_bias_rate needs to be interpolated based on that
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    % Part 4.1: SP solver
-    % Part 1 computes the coordinate of specular reflections and other 
-    % SP-related variables such as angles in variable frames, ranges,
-    % and etc.
-    clc
-
-    % compute SP locations, incidence angle and distance to coast
-    [sx_pos_xyz1,inc_angle_deg1,dis_to_coast_km1] = sp_solver(tx1,rx1,ddm1, ...
-        dtu10,NZSRTM30,dist_to_coast_nz);
-
-    % compute SP-related variables for each solved SP
-    % define LHCP or RHCP pattern to use:
-    % rf_source 4 = NGRx_RF3_NB = ANZ_RF2 = nadir_LHCP
-    % rf_source 8 = NGRx_RF5_NB = ANZ_RF3 = nadir_RHCP
-    if rf_source1 == 4
-        nadir_pattern = LHCP_pattern;
-    elseif rf_source1 == 8
-        nadir_pattern = RHCP_pattern;
-    end
-
-    % initialise variables
-    num_sx = size(sx_pos_xyz1,1);                   %number of SP positions solved by SP solver
-
-    sp_theta_body = zeros(num_sx,1);    sp_az_body = zeros(num_sx,1);
-    sp_theta_enu = zeros(num_sx,1);     sp_az_enu = zeros(num_sx,1);
-    gps_off_boresight = zeros(num_sx,1);
-
-    range_tsx = zeros(num_sx,1);        range_rsx = zeros(num_sx,1);
-
-    gps_pow = zeros(num_sx,1);          gps_gain_dbi = zeros(num_sx,1);
-    stat_eirp_watt = zeros(num_sx,1);
-
-    rx_gain = zeros(num_sx,1);
-    cross_pol = zeros(num_sx,1);
-
-    for l = 1:num_sx
-
-        sx_pos_xyz2 = sx_pos_xyz1(l,:);
-
-        [sp_angle_body1,sp_angle_enu1,theta_gps1,range1,gps_rad1,rx_rad1] = spRelated(tx1,rx1,sx_pos_xyz2, ...
-            SV_PRN_LUT,SV_eirp_LUT,nadir_pattern);
-
-        sp_theta_body(l) = sp_angle_body1(1);   sp_az_body(l) = sp_angle_body1(2);
-        sp_theta_enu(l) = sp_angle_enu1(1);     sp_az_enu(l) = sp_angle_enu1(2);
-        gps_off_boresight(l) = theta_gps1;
-
-        range_tsx(l) = range1(1);               range_rsx(l) = range1(2);
-
-        gps_pow(l) = gps_rad1(1);               gps_gain_dbi = gps_rad1(2);
-        stat_eirp_watt(l) = gps_rad1(3);
-
-        lhcp_gain_dbi = rx_rad1(1);             rhcp_gain_dbi = rx_rad1(2);
-
-        % compute cross polarisation
-        if rf_source1 == 4
-            rx_gain(l) = lhcp_gain_dbi;
-            cross_pol(l) = lhcp_gain_dbi-rhcp_gain_dbi;
-
-        elseif rf_source1 == 8
-            rx_gain(l) = rhcp_gain_dbi;
-            cross_pol(l) = rhcp_gain_dbi-lhcp_gain_dbi;
-
-        end        
-
-    end
-
-    % save SP sovler outputs to the post-calibrated structure
-    L1_postCal(i).tx_pos_x = tx_pos_xyz1(1);
-    L1_postCal(i).tx_pos_y = tx_pos_xyz1(2);
-    L1_postCal(i).tx_pos_z = tx_pos_xyz1(3);
-
-    L1_postCal(i).tx_vel_x = tx_vel_xyz1(1);
-    L1_postCal(i).tx_vel_y = tx_vel_xyz1(2);
-    L1_postCal(i).tx_vel_z = tx_vel_xyz1(3);
-
-    L1_postCal(i).ac_pos_x = rx_pos_xyz(i,1);
-    L1_postCal(i).ac_pos_y = rx_pos_xyz(i,2);
-    L1_postCal(i).ac_pos_z = rx_pos_xyz(i,3);
-%{
-    L1_postCal(i).ac_lat = rx_pos_lla1(1);
-    L1_postCal(i).ac_lon = rx_pos_lla1(2);
-    L1_postCal(i).ac_alt = rx_pos_lla1(3);    
-
-    L1_postCal(i).ac_roll = rx_attitude(i,1);
-    L1_postCal(i).ac_pitch = rx_attitude(i,2);
-    L1_postCal(i).ac_yaw = rx_attitude(i,3); 
-
-    L1_postCal(i).sp_pos_x = sx_pos_xyz1(:,1);
-    L1_postCal(i).sp_pos_y = sx_pos_xyz1(:,2);
-    L1_postCal(i).sp_pos_z = sx_pos_xyz1(:,3);
-%}
-    L1_postCal(i).sp_inc_angle = inc_angle_deg1;
-    L1_postCal(i).dis_to_coast = dis_to_coast_km1;
-
-    L1_postCal(i).sp_theta_body = sp_theta_body;
-    L1_postCal(i).sp_az_body = sp_az_body;
-
-    L1_postCal(i).sp_theta_enu = sp_theta_enu;
-    L1_postCal(i).sp_az_enu = sp_az_enu;
-
-    L1_postCal(i).tx_to_sp_range = range_tsx;
-    L1_postCal(i).rx_to_sp_range = range_rsx;
-
-    L1_postCal(i).gps_off_boresight_angle_deg = gps_off_boresight;
-    L1_postCal(i).static_gps_eirp = stat_eirp_watt;
-    L1_postCal(i).gps_tx_power_db_w = gps_pow;
-
-    L1_postCal(i).ddm_source = rf_source1;
-    L1_postCal(i).sp_rx_gain = rx_gain;
-    L1_postCal(i).cross_pol = cross_pol;
-
-    L1_postCal(i).zenith_code_phase = delay_dir_chips(i);
-        
-    % Part 4.1: SP solver ends
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
