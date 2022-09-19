@@ -1,5 +1,5 @@
 % this function correct the input code phase to a value between 0 and
-% a defined value P, P = 1023 for CPS L1 C/A
+% a defined value P, P = 1023 for GPS L1 and P = 4092 for GAL E1
 
 function delay_chips_out = delay_correction(delay_chips_in,P)
 

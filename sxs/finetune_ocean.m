@@ -29,6 +29,10 @@ sx_lla_final = sp_temp;                                 %finalised sp in lla
 sx_xyz_final = lla2ecef(sx_lla_final);                  %finalised sp in ecef-xyz
 
 %derive incidence angle
+rsx = rx_pos_xyz-sx_xyz_final;
+theta_i = acosd(dot(rsx,sx_xyz_final)/(norm(rsx)*norm(sx_xyz_final)));
+
+%{
 wgs84 = wgs84Ellipsoid;
 
 %convert Tx coordinate to ENU coordinate centred at the computed sx
@@ -40,3 +44,4 @@ unit_z = [0,0,1];                                       %unit vector along norma
 
 %incidence angles at the SP
 theta_i = acosd(dot(tx_enu,unit_z)/(norm(tx_enu)*norm(unit_z)));
+%}

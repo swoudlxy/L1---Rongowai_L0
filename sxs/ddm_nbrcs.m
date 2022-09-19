@@ -130,13 +130,13 @@ if (sp_delay_bin_float <= 40) && (sp_delay_bin_float >= 0) && ...
 else
 
     % sp bin beyond DDM region
-    nbrcs.nbrcs_scatter = -999;
-    nbrcs.nbrcs_value = -999;
+    nbrcs.nbrcs_scatter = -9999;
+    nbrcs.nbrcs_value = -9999;
 
-    LES.LES_scatter = -999;
-    LES.LES_slope = -999;
+    LES.LES_scatter = -9999;
+    LES.LES_slope = -9999;
 
-    TES.TES_scatter = -999;
-    TES.TES_slope = -999;
+    TES.TES_scatter = -9999;
+    TES.TES_slope = -9999;
 
 end

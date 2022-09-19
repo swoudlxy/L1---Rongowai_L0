@@ -24,8 +24,8 @@ y0 = lat;
 x0 = lon;
 
 %identify four close pixels
-x1 = floor(x0); x2 = ceil(x0); x = [x1,x2];
-y1 = floor(y0); y2 = ceil(y0); y = [y1;y2];
+x1 = floor(x0); x2 = ceil(x0);
+y1 = floor(y0); y2 = ceil(y0);
 
 x1_index = find(lon_dtu == x1); x2_index = find(lon_dtu == x2);
 y1_index = find(lat_dtu == y1); y2_index = find(lat_dtu == y2);
@@ -35,6 +35,9 @@ mss2 = mss_dtu(y1_index,x2_index);
 mss3 = mss_dtu(y2_index,x1_index);
 mss4 = mss_dtu(y2_index,x2_index);
 
-V = [mss1 mss2;mss3 mss4];
+fy = y0-y1;
+fx = x0-x1;
 
-mss = interp2(x,y,V,x0,y0);      %interpolated result
+temp1 = mss1*(1-fx)+fx*mss2;
+temp2 = mss3*(1-fx)+fx*mss4;
+mss = temp1*(1-fy)+temp2*fy;

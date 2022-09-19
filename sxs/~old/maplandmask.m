@@ -18,14 +18,20 @@ x0 = lon;
 x1_index = find(lon_landmask<x0,1,'last'); x2_index = find(lon_landmask>x0,1,'first');
 y1_index = find(lat_landmask<y0,1,'last'); y2_index = find(lat_landmask>y0,1,'first');
 
-x1 = lon_landmask(x1_index);    x2 = lon_landmask(x2_index);    x = [x1,x2];
-y1 = lat_landmask(y1_index);    y2 = lat_landmask(y2_index);    y = [y1;y2];
+x1 = lon_landmask(x1_index);    %x2 = lon_landmask(x2_index);    %x = [x1,x2];
+y1 = lat_landmask(y1_index);    %y2 = lat_landmask(y2_index);    %y = [y1;y2];
 
 dist1 = dist_landmask(y1_index,x1_index);
 dist2 = dist_landmask(y1_index,x2_index);
 dist3 = dist_landmask(y2_index,x1_index);
 dist4 = dist_landmask(y2_index,x2_index);
 
-V = [dist1 dist2;dist3 dist4];
+fy = y0-y1;
+fx = x0-x1;
 
-dist = interp2(x,y,V,x0,y0);      %interpolated result
+temp1 = dist1*(1-fx)+fx*dist2;
+temp2 = dist3*(1-fx)+fx*dist4;
+dist = temp1*(1-fy)+temp2*fy;
+
+%V = [dist1 dist2;dist3 dist4];
+%dist = interp2(x,y,V,x0,y0);      %interpolated result

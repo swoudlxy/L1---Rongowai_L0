@@ -9,12 +9,13 @@
 
 function brcs = ddm_brcs(power_analog,eirp_watt,rx_gain_db_i,TSx,RSx)
 
-c = 299792458;                      %light speed, m/s
-f = 1575.42e6;                      %GPS L1 band, Hz
-lambda = c/f;                       %wavelength, m
+% define constants
+c = 299792458;                      % light speed, m/s
+f = 1575.42e6;                      % GPS L1 band, Hz
+lambda = c/f;                       % wavelength, m
 lambda2 = lambda*lambda;
 
-rx_gain = db2pow(rx_gain_db_i);     %linear rx gain
+rx_gain = db2pow(rx_gain_db_i);     % linear rx gain
 
 term1 = (4*pi)^3/lambda2;
 term2 = (TSx*RSx)^2;

@@ -21,4 +21,4 @@ fclose(fid);
 
 dist_to_coast.lat = linspace(lat_min,lat_max,num_lat);
 dist_to_coast.lon = linspace(lon_min,lon_max,num_lon);
-dist_to_coast.dist = reshape(map_data,num_lat,num_lon);
+dist_to_coast.ele = reshape(map_data,num_lat,num_lon);

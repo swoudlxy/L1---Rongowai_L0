@@ -22,4 +22,4 @@ mss = reshape(map_data,num_lat,num_lon);
 
 dtu10.lat = lat;
 dtu10.lon = lon;
-dtu10.mss = mss;
+dtu10.ele = mss;
