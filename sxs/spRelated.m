@@ -13,7 +13,7 @@
 % 5) gps_rad: EIRP, tx power
 % 6) rx_rad: LHCP and RHCP antenna gain
 
-function [sp_angle_body,sp_angle_enu,theta_gps,range,gps_rad,rx_rad] = spRelated(tx,rx,sx_pos_xyz,SV_eirp_LUT,nadir_pattern)
+function [sp_angle_body,sp_angle_enu,sp_angle_ant,theta_gps,range,gps_rad,rx_rad] = spRelated(tx,rx,sx_pos_xyz,SV_eirp_LUT,nadir_pattern)
 
 % sparse structres
 tx_pos_xyz = tx.tx_pos_xyz;
@@ -68,13 +68,35 @@ stat_eirp_watt = 10^(stat_eirp_dbw/10);     % static eirp in linear watts
 
 gps_rad = [gps_pow_dbw,gps_gain_dbi,stat_eirp_watt];
 
-% compute rx radiation properties
-% this version assumes nadir antenna frame aligns with the aircraft's body
-% frame, need to be updated if they are different
-[~,az_index] = min(abs(sp_az_body-az_deg));
-[~,el_index] = min(abs(sp_theta_body-el_deg));
+% compute angles in nadir antenna frame and rx gain
+sp_theta_ant = sp_theta_body;
+sp_az_ant = sp_az_body+180;
+
+if sp_az_ant > 360
+    sp_az_ant = sp_az_ant-360;
+end
+
+sp_angle_ant = [sp_theta_ant,sp_az_ant];
+
+[~,az_index] = min(abs(sp_az_ant-az_deg));
+[~,el_index] = min(abs(sp_theta_ant-el_deg));
 
 lhcp_gain_dbi = lhcp_gain_pattern(az_index,el_index);
 rhcp_gain_dbi = rhcp_gain_pattern(az_index,el_index);
 
 rx_rad = [lhcp_gain_dbi,rhcp_gain_dbi];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
