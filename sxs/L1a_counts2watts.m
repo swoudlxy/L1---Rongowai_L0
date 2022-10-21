@@ -7,18 +7,22 @@
 % Outputs:
 % 1) signal_power_watts: signal power per bin
 % 2) noise_power_watts: noise power per bin
-% 3) snr: ratio between maximal signal power and average noise power
+% 3) ddm_snr: ratio between maximal signal power and average noise power
 
-function [signal_power_watts,noise_power_watts,snr_db] = L1a_counts2watts(raw_counts,ANZ_port,noise_std)
+function [signal_power_watts,noise_power_watts] = L1a_counts2watts(raw_counts,ANZ_port,noise_std)
+
+noise_only_counts_db = 78.3;
 
 % convert to db
-raw_counts_db = mag2db(raw_counts);
-%ddm_snr_db = raw_counts_db/2-78.3;          % 78.3 dB is the noise-only DDM counts
-ddm_snr_db = raw_counts_db-78.3;
+raw_counts_db = pow2db(raw_counts);
+ddm_snr_db = raw_counts_db/2-noise_only_counts_db;
 
 % define calibration factors
 signal_cal_factors_db = [-162.93,-163.98,-161.24];
 noise_cal_factors_db = [-133.51,-134.45,-132.13];
+
+% define corrected cable loss at 1575.42 MHz
+cable_loss_db = [1.8051,0.6600,0.5840];
 
 % perform calibration based on the input ANZ port channel
 switch ANZ_port
@@ -27,18 +31,21 @@ switch ANZ_port
         noise_std_ch1 = noise_std(1);
         cal_factors_ch1 = [signal_cal_factors_db(1),noise_cal_factors_db(1)];
 
-        [signal_power_watts,noise_power_watts,snr_db] = ddm_snr2watts(ddm_snr_db,noise_std_ch1,cal_factors_ch1);
+        [signal_power_watts,noise_power_watts] = ddm_snr2watts(ddm_snr_db,noise_std_ch1,cal_factors_ch1);
+        signal_power_watts = signal_power_watts*db2pow(cable_loss_db(1));
         
     case 2
         noise_std_ch2 = noise_std(2);
         cal_factors_ch2 = [signal_cal_factors_db(2),noise_cal_factors_db(2)];
 
-        [signal_power_watts,noise_power_watts,snr_db] = ddm_snr2watts(ddm_snr_db,noise_std_ch2,cal_factors_ch2);
+        [signal_power_watts,noise_power_watts] = ddm_snr2watts(ddm_snr_db,noise_std_ch2,cal_factors_ch2);
+        signal_power_watts = signal_power_watts*db2pow(cable_loss_db(2));
             
     case 3
         noise_std_ch3 = noise_std(3);
         cal_factors_ch3 = [signal_cal_factors_db(3),noise_cal_factors_db(3)];
 
-        [signal_power_watts,noise_power_watts,snr_db] = ddm_snr2watts(ddm_snr_db,noise_std_ch3,cal_factors_ch3);
+        [signal_power_watts,noise_power_watts] = ddm_snr2watts(ddm_snr_db,noise_std_ch3,cal_factors_ch3);
+        signal_power_watts = signal_power_watts*db2pow(cable_loss_db(3));
 
 end

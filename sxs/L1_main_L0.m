@@ -14,8 +14,7 @@ clc
 
 % load L0 netCDF
 path1 = '../dat/raw/';
-%L0_filename = [path1 '2022-09-22_L0.nc'];
-L0_filename = [path1 'Flight_1_2022-10-02.nc'];
+L0_filename = [path1 'Flight_4_2022-10-10.nc'];
 
 % PVT GPS week and sec
 pvt_gps_week = double(ncread(L0_filename,'/science/GPS_week_of_SC_attitude'));
@@ -32,9 +31,9 @@ rx_vel_y_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_velocity_y_ecef_
 rx_vel_z_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_velocity_z_ecef_mps'));
 
 % rx attitude, deg
-rx_pitch_deg_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_attitude_pitch_deg'));
-rx_roll_deg_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_attitude_roll_deg'));
-rx_yaw_deg_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_attitude_yaw_deg'));
+rx_pitch_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_attitude_pitch_deg'));
+rx_roll_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_attitude_roll_deg'));
+rx_yaw_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_attitude_yaw_deg'));
 
 % rx clock bias and drifts
 rx_clk_bias_m_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_clock_bias_m'));
@@ -70,26 +69,85 @@ num_delay_bins = double(ncread(L0_filename,'/science/ddm/num_delay_bins'));
 num_doppler_bins = double(ncread(L0_filename,'/science/ddm/num_doppler_bins'));
 
 % coherent duration and noncoherent integration
-% TODO: double check the units
 coherent_duration = double(ncread(L0_filename,'/science/ddm/L1_E1_coherent_duration'));
 non_coherent_integrations = double(ncread(L0_filename,'/science/ddm/L1_E1_non_coherent_integrations'));
 
-coherent_duration = coherent_duration/1000;
-non_coherent_integrations = non_coherent_integrations/1000;
-
 % NGRx estimate additional delay path
-add_range_to_sp = double(ncread(L0_filename,'/science/ddm/additional_range_to_SP'));
+add_range_to_sp_pvt = double(ncread(L0_filename,'/science/ddm/additional_range_to_SP'));
 
-wgs84_flag = 0;             % only for bench test data
+% antenna temperatures and engineering timestamp
+eng_timestamp = double(ncread(L0_filename,'/eng/packet_creation_time'));
+zenith_ant_temp_eng = double(ncread(L0_filename,'/eng/zenith_ant_temp'));
+nadir_ant_temp_eng = double(ncread(L0_filename,'/eng/nadir_ant_temp'));
 
 % Load L0 data ends
+
+%% Prelaunch 1.5: Filter valid timestampes
+clc
+
+c = 299792458;                              % speed of light
+
+% rx-related variables
+index1 = ~isnan(pvt_gps_week);
+
+pvt_gps_week = pvt_gps_week(index1);        pvt_gps_sec = pvt_gps_sec(index1);
+
+rx_pos_x_pvt = rx_pos_x_pvt(index1);        rx_pos_y_pvt = rx_pos_y_pvt(index1);
+rx_pos_z_pvt = rx_pos_z_pvt(index1);
+
+rx_vel_x_pvt = rx_vel_x_pvt(index1);        rx_vel_y_pvt = rx_vel_y_pvt(index1);
+rx_vel_z_pvt = rx_vel_z_pvt(index1);
+rx_vel_xyz_pvt = [rx_vel_x_pvt rx_vel_y_pvt rx_vel_z_pvt];
+
+rx_roll_pvt = rx_roll_pvt(index1);          rx_pitch_pvt = rx_pitch_pvt(index1);
+rx_yaw_pvt = rx_yaw_pvt(index1);
+
+rx_clk_bias_m_pvt = rx_clk_bias_m_pvt(index1);
+rx_clk_drift_mps_pvt = rx_clk_drift_mps_pvt(index1);
+
+% ddm-related variables
+index2 = ~isnan(transmitter_id(1,:));
+
+transmitter_id = transmitter_id(:,index2);
+
+raw_counts = raw_counts(:,:,:,index2); 
+zenith_i2q2 = zenith_i2q2(:,index2);
+
+rf_source = rf_source(:,index2);
+ddm_number = ddm_number(:,index2);
+
+delay_bin_res = delay_bin_res(index2);      doppler_bin_res = doppler_bin_res(index2);
+
+delay_center_bin = delay_center_bin(index2);
+doppler_center_bin = doppler_center_bin(index2);
+
+% absolute ddm center delay and doppler
+delay_center_chips = delay_center_chips(:,index2)/c;                    % correction to the chips  
+doppler_center_Hz = doppler_center_Hz(:,index2);
+
+% number of doppler and delay bins
+num_delay_bins = num_delay_bins(index2);   num_doppler_bins = num_doppler_bins(index2);
+
+% coherent duration and noncoherent integration
+coherent_duration = coherent_duration(index2)/1000;                     % convert to seconds
+non_coherent_integrations = non_coherent_integrations(index2)/1000;
+
+% NGRx estimate additional delay path
+add_range_to_sp_pvt = add_range_to_sp_pvt(:,index2);
+
+% temperatures from engineering data
+index3 = ~isnan(eng_timestamp);
+
+eng_timestamp = eng_timestamp(index3);
+nadir_ant_temp_eng = nadir_ant_temp_eng(index3);
+zenith_ant_temp_eng = zenith_ant_temp_eng(index3);
 
 %% Prelaunch 2 - define external data paths and filenames
 clc
 
 % define IGS orbits filename (*.sp3)
 % note this path is defined in C++ format
-gps_orbit_filename = '..//dat//orbits//igr21526.sp3';
+gps_orbit_filename = '..//dat//orbits//igr22310.sp3';
 
 % load SRTM_30 DEM
 dem_path = '../dat/dem/';
@@ -99,20 +157,11 @@ dem_file2 = 'nzsrtm_30_part2_v1.dat';
 dem1 = get_dem([dem_path dem_file1]);
 dem2 = get_dem([dem_path dem_file2]);
 
-if wgs84_flag == 1
-    dem1.ele = zeros(length(dem1.lat),length(dem1.lon));
-    dem2.ele = zeros(length(dem2.lat),length(dem2.lon));
-end
-
 % load DTU10 model
 dtu_path = '../dat/dtu/';
 dtu_filename = 'dtu10_v1.dat';
 
 dtu10 = get_dtu10([dtu_path dtu_filename]);
-
-if wgs84_flag == 1
-    dtu10.ele = zeros(length(dtu10.lat),length(dtu10.lon));
-end
 
 % load ocean/land (distance to coast) mask
 landmask_path = '../dat/cst/';
@@ -149,64 +198,7 @@ LHCP_pattern.RHCP = LHCP_R_gain_db_i;
 RHCP_pattern.LHCP = RHCP_L_gain_db_i;
 RHCP_pattern.RHCP = RHCP_R_gain_db_i;
 
-%% Prelaunch 2.5: Filter valid timestampes
-clc
-
-valid_index = ~isnan(pvt_gps_week);
-
-pvt_gps_week = pvt_gps_week(valid_index);       pvt_gps_sec = pvt_gps_sec(valid_index);
-
-rx_pos_x_pvt = rx_pos_x_pvt(valid_index);       rx_pos_y_pvt = rx_pos_y_pvt(valid_index);
-rx_pos_z_pvt = rx_pos_z_pvt(valid_index);
-
-rx_vel_x_pvt = rx_vel_x_pvt(valid_index);       rx_vel_y_pvt = rx_vel_y_pvt(valid_index);
-rx_vel_z_pvt = rx_vel_z_pvt(valid_index);
-
-rx_roll_deg_pvt = rx_roll_deg_pvt(valid_index); rx_pitch_deg_pvt = rx_pitch_deg_pvt(valid_index);
-rx_yaw_deg_pvt = rx_yaw_deg_pvt(valid_index);
-
-rx_clk_bias_m_pvt = rx_clk_bias_m_pvt(valid_index);
-rx_clk_drift_mps_pvt = rx_clk_drift_mps_pvt(valid_index);
-
-transmitter_id = transmitter_id(:,valid_index);
-
-raw_counts = raw_counts(:,:,:,valid_index);     
-zenith_i2q2 = zenith_i2q2(:,valid_index);
-
-rf_source = rf_source(:,valid_index);
-ddm_number = ddm_number(:,valid_index);
-
-noise_std_dev_rf1 = noise_std_dev_rf1(valid_index);
-noise_std_dev_rf2 = noise_std_dev_rf2(valid_index); 
-noise_std_dev_rf3 = noise_std_dev_rf3(valid_index);
-
-delay_bin_res = delay_bin_res(valid_index);     doppler_bin_res = doppler_bin_res(valid_index);
-
-delay_center_bin = delay_center_bin(valid_index);
-doppler_center_bin = doppler_center_bin(valid_index);
-
-% absolute ddm center delay and doppler
-delay_center_chips = delay_center_chips(:,valid_index);    
-doppler_center_Hz = doppler_center_Hz(:,valid_index);
-
-% number of doppler and delay bins
-num_delay_bins = num_delay_bins(valid_index);   num_doppler_bins = num_doppler_bins(valid_index);
-
-% coherent duration and noncoherent integration
-% TODO: double check the units
-coherent_duration = coherent_duration(valid_index);
-non_coherent_integrations = non_coherent_integrations(valid_index);
-
-%coherent_duration = coherent_duration/1000;
-%non_coherent_integrations = non_coherent_integrations/1000;
-
-% NGRx estimate additional delay path
-add_range_to_sp = add_range_to_sp(:,valid_index);
-
 %% Part 1: General processing
-% 1 - process timestamps and UTC human time
-% 2 - interpolate all parameters to DDM timestamp
-% 3 - other general/global variables
 clc
 
 invalid = -9999;                                    % defines the value to be used for invalid fields
@@ -220,6 +212,7 @@ non_coherent_integrations(isnan(non_coherent_integrations)) = invalid;
 pvt_utc = zeros(I,1)+invalid;       ddm_utc = zeros(I,1)+invalid;
 gps_week = zeros(I,1)+invalid;      gps_tow = zeros(I,1)+invalid;
 ddm_pvt_bias = zeros(I,1)+invalid;
+add_range_to_sp = zeros(J,I)+invalid;
 
 % initialise a structure to save L1 results
 L1_postCal = struct;
@@ -231,45 +224,71 @@ for i = 1:I
     pvt_gps_sec1 = pvt_gps_sec(i);
     non_coherent1 = non_coherent_integrations(i);
 
-    if non_coherent1 ~= -9999
-     
-        % convert pvt_gps_time to pvt_utc time
-        D_pvt1 = gpstime2utc(pvt_gps_week1,pvt_gps_sec1);
-        D_pvt2 = datetime(D_pvt1(1),D_pvt1(2),D_pvt1(3),D_pvt1(4),D_pvt1(5),D_pvt1(6)); % human time
-        pvt_utc1 = convertTo(D_pvt2,'posixtime');    
+    % convert pvt_gps_time to pvt_utc time
+    D_pvt1 = gpstime2utc(pvt_gps_week1,pvt_gps_sec1);
+    D_pvt2 = datetime(D_pvt1(1),D_pvt1(2),D_pvt1(3),D_pvt1(4),D_pvt1(5),D_pvt1(6)); % human time
+    pvt_utc1 = convertTo(D_pvt2,'posixtime');    
 
-        % derive ddm_utc, mid point of the non-coherent integrations
-        ddm_utc1 = pvt_utc1+non_coherent1/2;    
+    % derive ddm_utc, mid point of the non-coherent integrations
+    ddm_utc1 = pvt_utc1+non_coherent1/2;    
     
-        % derive ddm_gps_week and ddm_gps_sec
-        D_ddm1 = datetime(ddm_utc1,'ConvertFrom','posixtime');
-        [year,month,day] = ymd(D_ddm1);
-        [hour,mins,secs] = hms(D_ddm1);
-        [ddm_gps_week1,ddm_gps_sec1] = utc2gpstime(year,month,day,hour,mins,secs);
+    % derive ddm_gps_week and ddm_gps_sec
+    D_ddm1 = datetime(ddm_utc1,'ConvertFrom','posixtime');
+    [year,month,day] = ymd(D_ddm1);
+    [hour,mins,secs] = hms(D_ddm1);
+    [ddm_gps_week1,ddm_gps_sec1] = utc2gpstime(year,month,day,hour,mins,secs);
 
-        % save pvt and ddm timestamps for interpolation
-        pvt_utc(i) = pvt_utc1;          ddm_utc(i) = ddm_utc1;
-        gps_week(i) = ddm_gps_week1;    gps_tow(i) = ddm_gps_sec1;
-        ddm_pvt_bias(i) = non_coherent1/2;
-    
-    end
+    % save pvt and ddm timestamps for interpolation
+    pvt_utc(i) = pvt_utc1;          ddm_utc(i) = ddm_utc1;
+    gps_week(i) = ddm_gps_week1;    gps_tow(i) = ddm_gps_sec1;
+    ddm_pvt_bias(i) = non_coherent1/2;
 
 end
 
 % linear interpolation all the values at ddm timestamp
-[rx_pos_xyz,rx_vel_xyz,rx_attitude,rx_clk] = PVT2ddm_timestamp(pvt_utc,ddm_utc,rx_pos_xyz_pvt, ...
-    rx_vel_xyz_pvt,rx_attitude_pvt,rx_clk_pvt);
+rx_pos_x = interp1(pvt_utc,rx_pos_x_pvt,ddm_utc,'linear','extrap');
+rx_pos_y = interp1(pvt_utc,rx_pos_y_pvt,ddm_utc,'linear','extrap');
+rx_pos_z = interp1(pvt_utc,rx_pos_z_pvt,ddm_utc,'linear','extrap');
+rx_pos_xyz = [rx_pos_x rx_pos_y rx_pos_z];
+
+rx_vel_x = interp1(pvt_utc,rx_vel_x_pvt,ddm_utc,'linear','extrap');
+rx_vel_y = interp1(pvt_utc,rx_vel_y_pvt,ddm_utc,'linear','extrap');
+rx_vel_z = interp1(pvt_utc,rx_vel_z_pvt,ddm_utc,'linear','extrap');
+rx_vel_xyz = [rx_vel_x rx_vel_y rx_vel_z];
+
+rx_roll = interp1(pvt_utc,rx_roll_pvt,ddm_utc,'linear','extrap');
+rx_pitch = interp1(pvt_utc,rx_pitch_pvt,ddm_utc,'linear','extrap');
+rx_yaw = interp1(pvt_utc,rx_yaw_pvt,ddm_utc,'linear','extrap');
+rx_attitude = [rx_roll rx_pitch rx_yaw];
+
+rx_clk_bias_m = interp1(pvt_utc,rx_clk_bias_m_pvt,ddm_utc,'linear','extrap');
+rx_clk_drift_mps = interp1(pvt_utc,rx_clk_drift_mps_pvt,ddm_utc,'linear','extrap');
+rx_clk = [rx_clk_bias_m rx_clk_drift_mps];
+
+for j = 1:J
+    
+    temp = add_range_to_sp_pvt(j,:);
+    temp1 = interp1(pvt_utc,temp,ddm_utc,'linear','extrap');
+    add_range_to_sp(j,:) = temp1;
+
+end
+
+ant_temp_zenith = interp1(eng_timestamp,zenith_ant_temp_eng,ddm_utc,'linear','extrap');
+ant_temp_nadir = interp1(eng_timestamp,nadir_ant_temp_eng,ddm_utc,'linear','extrap');
 
 % get <lat,lon,alt> of aircraft
 rx_pos_lla = ecef2lla(rx_pos_xyz);
 
 % write global variables
-% TODO: flight ID needs to be retrieved from OpenSky
-L1_postCal.time_coverage_start = datetime(ddm_utc(1),'ConvertFrom','posixtime');        % human time
-L1_postCal.time_coverage_end = datetime(ddm_utc(end),'ConvertFrom','posixtime');
+time_coverage_start = string(datetime(ddm_utc(1),'ConvertFrom','posixtime'));
+L1_postCal.time_coverage_start = time_coverage_start;
+
+time_coverage_end = string(datetime(ddm_utc(end),'ConvertFrom','posixtime'));
+L1_postCal.time_coverage_end = time_coverage_end;
+
 L1_postCal.time_coverage_resolution = ddm_utc(2)-ddm_utc(1);
 
-% time coverage, not possible for more than 1 day
+% time coverage
 time_duration = ddm_utc(end)-ddm_utc(1)+1;
 hours = floor(time_duration/3600);
 minutes = floor((time_duration-hours*3600)/60);
@@ -278,15 +297,14 @@ time_coverage_duration = ['P0DT' num2str(hours) 'H' num2str(minutes) 'M' num2str
 
 L1_postCal.time_coverage_duration = time_coverage_duration;
 
-L1_postCal.aircraft_reg = 'ZK-NFA';
-L1_postCal.ddm_source = 1;                      % 1 = GPS signal simulator, 2 = aircraft
+L1_postCal.aircraft_reg = 'ZK-NFA';             % default value
+L1_postCal.ddm_source = 2;                      % 1 = GPS signal simulator, 2 = aircraft
 L1_postCal.ddm_time_type_selector = 1;          % 1 = middle of DDM sampling period
 L1_postCal.delay_resolution = 0.25;             % unit in chips
 L1_postCal.dopp_resolution = 500;               % unit in Hz
-L1_postCal.fixed_noise_power = 78.3;            % unit in dB
 L1_postCal.dem_source = 'SRTM30';
 
-% write version numbers
+% write algorithm and LUT versions
 L1_postCal.l1_algorithm_version = '1';
 L1_postCal.l1_data_version = '1';
 L1_postCal.l1a_sig_LUT_version = '1';
@@ -298,6 +316,7 @@ L1_postCal.prn_sv_maps_version = '1';
 L1_postCal.gps_eirp_param_version = '7';
 L1_postCal.land_mask_version = '1';
 L1_postCal.mean_sea_surface_version = '1';
+L1_postCal.per_bin_ant_version = '1';
 
 % write timestamps and ac-related variables
 L1_postCal.pvt_timestamp_gps_week = pvt_gps_week;
@@ -318,21 +337,21 @@ L1_postCal.ac_pos_x_pvt = rx_pos_x_pvt;
 L1_postCal.ac_pos_y_pvt = rx_pos_y_pvt;
 L1_postCal.ac_pos_z_pvt = rx_pos_z_pvt;
 
-L1_postCal.ac_pos_x = rx_pos_xyz(:,1);
-L1_postCal.ac_pos_y = rx_pos_xyz(:,2);
-L1_postCal.ac_pos_z = rx_pos_xyz(:,3);
+L1_postCal.ac_pos_x = rx_pos_x;
+L1_postCal.ac_pos_y = rx_pos_y;
+L1_postCal.ac_pos_z = rx_pos_z;
 
 L1_postCal.ac_vel_x_pvt = rx_vel_x_pvt;
 L1_postCal.ac_vel_y_pvt = rx_vel_y_pvt;
 L1_postCal.ac_vel_z_pvt = rx_vel_z_pvt;
 
-L1_postCal.ac_vel_x = rx_vel_xyz(:,1);
-L1_postCal.ac_vel_y = rx_vel_xyz(:,2);
-L1_postCal.ac_vel_z = rx_vel_xyz(:,3);
+L1_postCal.ac_vel_x = rx_vel_x;
+L1_postCal.ac_vel_y = rx_vel_y;
+L1_postCal.ac_vel_z = rx_vel_z;
 
-L1_postCal.ac_roll_pvt = rx_roll_deg_pvt;
-L1_postCal.ac_pitch_pvt = rx_pitch_deg_pvt;
-L1_postCal.ac_yaw_pvt = rx_yaw_deg_pvt;
+L1_postCal.ac_roll_pvt = rx_roll_pvt;
+L1_postCal.ac_pitch_pvt = rx_pitch_pvt;
+L1_postCal.ac_yaw_pvt = rx_yaw_pvt;
 
 L1_postCal.ac_roll = rx_attitude(:,1);
 L1_postCal.ac_pitch = rx_attitude(:,2);
@@ -341,8 +360,11 @@ L1_postCal.ac_yaw = rx_attitude(:,3);
 L1_postCal.rx_clk_bias_pvt = rx_clk_bias_m_pvt;
 L1_postCal.rx_clk_drift_pvt = rx_clk_drift_mps_pvt;
 
-L1_postCal.rx_clk_bias = rx_clk(:,1);
-L1_postCal.rx_clk_drift = rx_clk(:,2);
+L1_postCal.rx_clk_bias = rx_clk_bias_m;
+L1_postCal.rx_clk_drift = rx_clk_drift_mps;
+
+L1_postCal.ant_temp_nadir = ant_temp_nadir;
+L1_postCal.ant_temp_zenith = ant_temp_zenith;
 
 % Part 1 ends
 
