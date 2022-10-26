@@ -1,7 +1,7 @@
 % this function outputs the local DEM data around the local coordinate P
 % P - LLA coordinate
 
-function local_dem = get_local_dem(P,L,dem_res,dem_data1,dem_data2,dtu_model,landmask_model,varargin)
+function local_dem = get_local_dem(P,L,dem_res,dem_data1,dem_data2)
 
 lat_P = P(1);   lon_P = P(2);
 
@@ -53,29 +53,6 @@ elseif (lat_P>lat2(half_num_pixel)) && (lat_P<=lat2(1))
     local_ele = [ele1(end-diff:end-1,lon_index-half_num_pixel:lon_index+half_num_pixel);
         ele2(1:lat_index+half_num_pixel,lon_index-half_num_pixel:lon_index+half_num_pixel)];
 
-end
-
-if nargin > 5
-    
-    % replace the elevation over ocean surface
-    P_dist_to_coast = get_map_value(lat_P,lon_P,landmask_model);
-    land_ocean_margin = -25;
-
-    if P_dist_to_coast < land_ocean_margin
-
-        for i = 1:num_pixel
-            for j = 1:num_pixel
-
-                lat1 = local_lat(i);
-                lon1 = local_lon(j);
-                temp = get_map_value(lat1,lon1,dtu_model);
-
-                local_ele(i,j) = temp;
-
-            end
-        end
-
-    end
 end
 
 local_dem.lat = local_lat;

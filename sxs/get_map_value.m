@@ -16,7 +16,7 @@ ele_map = model.ele;
 y0 = lat;  
 x0 = lon;
 
-%longitude adjustment
+% longitude adjustment
 if lon < 0
     lon = lon+360;
 elseif lon > 360

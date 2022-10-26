@@ -31,17 +31,3 @@ sx_xyz_final = lla2ecef(sx_lla_final);                  %finalised sp in ecef-xy
 %derive incidence angle
 rsx = rx_pos_xyz-sx_xyz_final;
 theta_i = acosd(dot(rsx,sx_xyz_final)/(norm(rsx)*norm(sx_xyz_final)));
-
-%{
-wgs84 = wgs84Ellipsoid;
-
-%convert Tx coordinate to ENU coordinate centred at the computed sx
-[tx_e,tx_n,tx_u] = ecef2enu(tx_pos_xyz(1),tx_pos_xyz(2),tx_pos_xyz(3), ...
-    sx_lla_final(1),sx_lla_final(2),sx_lla_final(3),wgs84);
-tx_enu = [tx_e,tx_n,tx_u];
-
-unit_z = [0,0,1];                                       %unit vector along normal to the surface
-
-%incidence angles at the SP
-theta_i = acosd(dot(tx_enu,unit_z)/(norm(tx_enu)*norm(unit_z)));
-%}

@@ -18,14 +18,11 @@ function [sp_angle_body,sp_angle_enu,sp_angle_ant,theta_gps,range,gps_rad,rx_rad
 % sparse structres
 tx_pos_xyz = tx.tx_pos_xyz;
 tx_vel_xyz = tx.tx_vel_xyz;
-SV = tx.sv_num;
+sv_num = tx.sv_num;
 
 rx_pos_xyz = rx.rx_pos_xyz;
 rx_vel_xyz = rx.rx_vel_xyz;
 rx_att = rx.rx_attitude;
-
-%az_deg = nadir_pattern.az_deg;
-%el_deg = nadir_pattern.el_deg;
 
 % define azimuth and elevation angle in the antenna frame
 res = 0.1;                                          % resolution in degrees
@@ -51,7 +48,7 @@ R_rsx = norm(sx_pos_xyz-rx_pos_xyz);        % range from rx to sx
 range = [R_tsx R_rsx];
 
 % compute gps radiation properties
-j = SV_eirp_LUT(:,1) == SV;                 % index of SV number in eirp LUT
+j = SV_eirp_LUT(:,1) == sv_num;             % index of SV number in eirp LUT
 
 gps_pow_dbw = SV_eirp_LUT(j,3);             % gps power in dBw
 

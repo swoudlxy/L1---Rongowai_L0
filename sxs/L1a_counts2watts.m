@@ -9,13 +9,17 @@
 % 2) noise_power_watts: noise power per bin
 % 3) ddm_snr: ratio between maximal signal power and average noise power
 
-function [signal_power_watts,noise_power_watts] = L1a_counts2watts(raw_counts,ANZ_port,noise_std)
+function [signal_power_watts,noise_power_watts,noise_floor] = L1a_counts2watts(raw_counts,ANZ_port,noise_std)
 
-noise_only_counts_db = 78.3;
-
-% convert to db
 raw_counts_db = pow2db(raw_counts);
-ddm_snr_db = raw_counts_db/2-noise_only_counts_db;
+
+noise_floor = mean(raw_counts(:,end-4:end),'all');
+noise_floor_db = pow2db(noise_floor);
+
+ddm_snr_db = raw_counts_db-noise_floor_db;          % DDM (S+N) to N ratio
+
+%noise_only_counts_db = 78.3;
+%ddm_snr_db = raw_counts_db/2-noise_only_counts_db;
 
 % define calibration factors
 signal_cal_factors_db = [-162.93,-163.98,-161.24];

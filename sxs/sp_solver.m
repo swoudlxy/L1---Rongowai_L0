@@ -2,77 +2,66 @@
 % SP solver also reports the local incidence angle and the distance to coast in km where the SP occur
 % All variables are reported in ECEF
 % Inputs:
-% 1) tx, rx, and ddm properties as a structure
+% 1) tx and rx positions
 % 2) DEM models: dtu10, NZSRTM30, and land-ocean mask
-% 3) wgs84_flag = 1 controls the solved SP coordinates only on WGS84 datum
 % Outputs:
-% 1) sx_pos_xyz: sx position and velocity vectors in ECEF
+% 1) sx_pos_xyz: sx positions in ECEF
 % 2) in_angle_deg: local incidence angle at the specular reflection
+% 3) distance to coast in kilometer
+% 4) LOS flag
 
-function [sx_pos_xyz,inc_angle_deg,dis_to_coast_km] = sp_solver(tx,rx,ddm,dem1,dem2,dtu10,dist_to_coast_nz,wgs84_flag)
-
-% retrieve tx and rx position vectors
-tx_pos_xyz = tx.tx_pos_xyz;
-rx_pos_xyz = rx.rx_pos_xyz;
+function [sx_pos_xyz,inc_angle_deg,d_snell_deg,dist_to_coast_km,LOS_flag] = sp_solver(tx_pos_xyz,rx_pos_xyz,dem_data1,dem_data2,dtu10,dist_to_coast_nz)
 
 % step 0 - check if LOS exists
-LOS_flag = los_status(tx_pos_xyz,rx_pos_xyz);       % LOS flag, 1 = LOS exit
+LOS_flag = los_status(tx_pos_xyz,rx_pos_xyz);
 
 if LOS_flag == 1
         
-    % step 1 - derive inital SP coordinate on WGS84
-    [sx_xyz_coarse,sx_lla_coarse] = coarsetune(tx_pos_xyz,rx_pos_xyz);
+    % step 1 - derive SP coordinate on WGS84 and DTU10
+    [~,sx_lla_coarse] = coarsetune(tx_pos_xyz,rx_pos_xyz);
 
-    if wgs84_flag == 1
-        sx_pos_xyz = sx_xyz_coarse;
-        rsx = rx_pos_xyz-sx_pos_xyz;
-        inc_angle_deg = acosd(dot(sx_pos_xyz,rsx)/(norm(sx_pos_xyz)*norm(rsx)));
+    L_ocean_deg = 1;                            % initial searching region in degrees
+    res_ocean_meter = 0.01;                     % converge criteria 0.01 meter
 
-    elseif wgs84_flag == 0
-        % step 2 - land-ocean mask to determine landcover type
-        dist = get_map_value(sx_lla_coarse(1),sx_lla_coarse(2),dist_to_coast_nz);
+    [sx_pos_xyz,inc_angle_deg] = finetune_ocean(tx_pos_xyz,rx_pos_xyz, ...
+        sx_lla_coarse,dtu10,L_ocean_deg,res_ocean_meter);
+    d_snell_deg = 0;
 
-        % ocean-land boundary: -25 km
-        ocean_land_margin = -25;
-        if dist < ocean_land_margin
-            land_flag = 0;                          % raw SP on ocean
+    % step 2 - project to local DEM for land SPs
+    sx_pos_lla = ecef2lla(sx_pos_xyz);
+    dist = get_map_value(sx_pos_lla(1),sx_pos_lla(2),dist_to_coast_nz);
 
-        elseif dist >= ocean_land_margin
-            land_flag = 1;                          % raw SP on land
+    if dist > 0
 
-        end
+        local_dem = get_local_dem(sx_pos_lla,90,30,dem_data1,dem_data2);
+        local_height = local_dem.ele;
+        local_height = local_height(2,2);       % local height of the SP
 
-        % step 3 - fine-tune initial SP coordinate
-        if land_flag == 0
-    
-            % step 3.1 - ocean SP
-            L_ocean_deg = 1;                        % search area starting from 1*1 deg
-            res_ocean_meter = 0.01;                 % targeted grid resolution - 1 cm
+        % projection to local dem
+        term1 = sx_pos_xyz/norm(sx_pos_xyz);
+        term2 = term1*local_height;
+        sx_pos_xyz = sx_pos_xyz+term2;
 
-            [sx_pos_xyz,inc_angle_deg] = finetune_ocean(tx_pos_xyz,rx_pos_xyz, ...
-                sx_lla_coarse,dtu10,L_ocean_deg,res_ocean_meter);
+        % local incidence angle
+        [theta_i,theta_s,phi_i,phi_s] = angles(local_dem.lat,local_dem.lon,local_dem.ele,tx_pos_xyz,rx_pos_xyz);
         
-        elseif land_flag == 1
+        inc_angle_deg = theta_i;
 
-            L_land_meter = 6030;                    % search area boundary in meters
-            res_land_meter = 30;                    % resolution of the DEM in meters
+        d_theta = theta_i-theta_s;
+        d_phi1 = sind(phi_s-(phi_i+180))/cosd(phi_s-(phi_i+180));
+        d_phi = atand(d_phi1);
 
-            [sx_pos_xyz,inc_angle_deg] = finetune_land(tx,rx,sx_lla_coarse, ...
-                L_land_meter,res_land_meter,ddm,dem1,dem2);
-
-        end
-
+        d_snell_deg = abs(d_theta)+abs(d_phi); 
     end
 
-    % step 4 - derive distance to coast in kilometer
-    sx_lla = ecef2lla(sx_pos_xyz);    
-    dis_to_coast_km = get_map_value(sx_lla(1),sx_lla(2),dist_to_coast_nz);
+    dist_to_coast_km = dist;
 
 elseif LOS_flag == 0
 
     %no sx if no LOS between rx and tx
-    sx_pos_xyz = [-9999,-9999,-9999];
-    inc_angle_deg = -9999;
-    dis_to_coast_km = -9999;
+    sx_pos_xyz = [-99999999,-99999999,-99999999];
+    inc_angle_deg = -99999999;
+    d_snell_deg = -99999999;
+    dist_to_coast_km = -99999999;
 
 end

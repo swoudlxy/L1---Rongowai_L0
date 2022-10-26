@@ -31,7 +31,7 @@ for m = 1:num_grid
         p_lat = lat_bin(m);
         p_lon = lon_bin(n);
 
-        p_ele = mapdtu(p_lat,p_lon,model);
+        p_ele = get_map_value(p_lat,p_lon,model);
 
         p_xyz = lla2ecef([p_lat p_lon p_ele]);
         p_delay = pdis(tx_xyz,rx_xyz,p_xyz);
