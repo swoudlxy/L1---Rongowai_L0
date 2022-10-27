@@ -155,11 +155,9 @@ gps_orbit_filename = '..//dat//orbits//igr22310.sp3';
 
 % load SRTM_30 DEM
 dem_path = '../dat/dem/';
-dem_file1 = 'nzsrtm_30_part1_v1.dat';
-dem_file2 = 'nzsrtm_30_part2_v1.dat';
+dem_file = 'nzsrtm_30_v1.tif';
 
-dem1 = get_dem([dem_path dem_file1]);
-dem2 = get_dem([dem_path dem_file2]);
+dem = get_dem([dem_path dem_file]);
 
 % load DTU10 model
 dtu_path = '../dat/dtu/';
@@ -540,6 +538,7 @@ sx_vel_y = zeros(J,I)+invalid;
 sx_vel_z = zeros(J,I)+invalid;
 
 sx_inc_angle = zeros(J,I)+invalid;
+sx_d_snell_angle = zeros(J,I)+invalid;
 dist_to_coast_km = zeros(J,I)+invalid;
 
 LOS_flag = zeros(J,I)+invalid;
@@ -589,8 +588,8 @@ for i = 1:I
             % Part 4.1: SP solver
             % derive SP positions, angle of incidence and distance
             % to coast
-            [sx_pos_xyz1,inc_angle_deg1,dist_to_coast_km1,LOS_flag1] = sp_solver(tx_pos_xyz1,rx_pos_xyz1, ...
-                dem1,dem2,dtu10,landmask_nz);
+            [sx_pos_xyz1,inc_angle_deg1,d_snell_deg1,dist_to_coast_km1,LOS_flag1] = sp_solver(tx_pos_xyz1,rx_pos_xyz1, ...
+                dem,dtu10,landmask_nz);
             
             sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
 
@@ -598,7 +597,7 @@ for i = 1:I
             dt = 1;                                         % time step in second
             tx_pos_xyz_dt = tx_pos_xyz1+dt*tx_vel_xyz1;
             rx_pos_xyz_dt = rx_pos_xyz1+dt*rx_vel_xyz1;
-            [sx_pos_xyz_dt,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem1,dem2,dtu10,landmask_nz);
+            [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem,dtu10,landmask_nz);
 
             sx_vel_xyz1 = sx_pos_xyz_dt-sx_pos_xyz1;
 
@@ -616,6 +615,7 @@ for i = 1:I
             sx_vel_z(j,i) = sx_vel_xyz1(3);
 
             sx_inc_angle(j,i) = inc_angle_deg1;
+            sx_d_snell_angle(j,i) = d_snell_deg1;
             dist_to_coast_km(j,i) = dist_to_coast_km1;
 
             LOS_flag(j,i) = LOS_flag1;
@@ -698,6 +698,7 @@ L1_postCal.rx_to_sp_range = rx_to_sp_range;
 L1_postCal.tx_to_sp_range = tx_to_sp_range;
 
 L1_postCal.sp_inc_angle = sx_inc_angle;
+L1_postCal.sp_d_snell_angle = sx_d_snell_angle;
 
 L1_postCal.sp_theta_body = sx_theta_body;
 L1_postCal.sp_az_body = sx_az_body;
@@ -721,10 +722,20 @@ brcs_ddm_peak_bin_dopp_col = zeros(J,I)+invalid;
 brcs_ddm_sp_bin_delay_row = zeros(J,I)+invalid;
 brcs_ddm_sp_bin_dopp_col = zeros(J,I)+invalid;
 
+sp_delay_error = zeros(J,I)+invalid;
+sp_dopp_error = zeros(J,I)+invalid;
+
+confidence_flag = zeros(J,I)+invalid;
+
 zenith_code_phase = zeros(J,I)+invalid;
 
-%{
 brcs = zeros(5,40,J,I)+invalid;
+A_eff = zeros(5,40,J,I)+invalid;
+
+surface_reflectivity = zeros(5,40,J,I)+invalid;
+surface_reflectivity_peak = zeros(J,I)+invalid;
+
+%{
 eff_scatter = zeros(5,40,J,I)+invalid;
 nbrcs_scatter_area = zeros(J,I)+invalid;
 nbrcs = zeros(J,I)+invalid;
@@ -746,14 +757,14 @@ fresnel_major = zeros(5,40,J,I)+invalid;
 fresnel_orientation = zeros(5,40,J,I)+invalid;
 %}
 
-for i = 1:I
+for i = 1:I %501
 
     % retrieve rx positions and velocities
-    rx_pos_xyz1 = rx_pos_xyz(i,:);      rx1.rx_pos_xyz = rx_pos_xyz1;
-    rx_vel_xyz1 = rx_vel_xyz(i,:);      rx1.rx_vel_xyz = rx_vel_xyz1;
-    rx_clk_drift1 = rx_clk_drift(i,:);  rx1.rx_clk_drift = rx_clk_drift;
+    rx_pos_xyz1 = rx_pos_xyz(i,:);          rx1.rx_pos_xyz = rx_pos_xyz1;
+    rx_vel_xyz1 = rx_vel_xyz(i,:);          rx1.rx_vel_xyz = rx_vel_xyz1;
+    rx_clk_drift1 = rx_clk_drift_mps(i,:);  rx1.rx_clk_drift = rx_clk_drift1;
 
-    for j = 1:J
+    for j = 1:J %2
 
         % retrieve tx positions and velocities
         tx_pos_xyz1 = [tx_pos_x(j,i) tx_pos_y(j,i) tx_pos_z(j,i)];
@@ -761,7 +772,21 @@ for i = 1:I
         tx1.tx_pos_xyz = tx_pos_xyz1;
         tx1.tx_vel_xyz = tx_vel_xyz1;
 
+        % retrieve sx-related parameters
         sx_pos_xyz1 = [sx_pos_x(j,i) sx_pos_y(j,i) sx_pos_z(j,i)];
+        sx_pos_lla1 = ecef2lla(sx_pos_xyz1);
+
+        sx_d_snell_deg1 = sx_d_snell_angle(j,i);
+        dist_to_coast1 = dist_to_coast_km(j,i);
+
+        sx1.sx_pos_xyz = sx_pos_xyz1;
+        sx1.sx_d_snell = sx_d_snell_deg1;
+        sx1.dist_to_coast = dist_to_coast1;
+
+        eirp_watt1 = static_gps_eirp(j,i);
+        rx_gain_db_i1 = sx_rx_gain(j,i);
+        TSx1 = tx_to_sp_range(j,i);
+        RSx1 = rx_to_sp_range(j,i);
 
         % retrieve ddm-related variables
         raw_counts1 = raw_counts(:,:,j,i);          ddm1.raw_counts = raw_counts1;
@@ -775,23 +800,67 @@ for i = 1:I
         doppler_center_hz1 = doppler_center_hz(j,i);
         ddm1.doppler_center_hz = doppler_center_hz1;
 
+        T_coh1 = coherent_duration(i);
+        ddm1.T_coh = T_coh1;
+
         ddm1.delay_resolution = 0.25;   ddm1.num_delay_bins = 40;   ddm1.delay_center_bin = 19;
         ddm1.doppler_resolution = 500;  ddm1.num_doppler_bins = 5;  ddm1.doppler_center_bin = 2;
-
-        % Part 4.3: SP-related variables - 2
-        % this part derives confidence, bin locations of SP
-        if tx_pos_x(j,i) ~= invalid
+        
+        if (tx_pos_x(j,i) ~= invalid) && (sum(raw_counts1,'all')~=0)
             
+            % Part 4.3: SP-related variables - 2
+            % this part derives confidence, bin locations of SP
             raw_counts_max = max(raw_counts1,[],'all');
-            [peak_doppler_bin1,peak_delay_bin1] = find(raw_counts1 == raw_counts_max);
+            [peak_doppler_bin1,peak_delay_bin1] = find(raw_counts1 == raw_counts_max,1);
 
-            %[confidence_flag1,zenith_code_phase1] = get_confidence_flag(tx1,rx1,sx_pos_xyz1,ddm1);
-            %sp_bin1 = get_sp_bin(tx1,rx1,ddm1);
+            % TODO: correct doppler col and error to correct values once
+            % center doppler values are correct
+            [specular_bin1,zenith_code_phase1,confidence_flag1] = get_specular_bin(tx1,rx1,sx1,ddm1);
+
+            % Part 4.4: brcs, nbrcs, effective area
+            brcs1 = ddm_brcs(power_analog1,eirp_watt1,rx_gain_db_i1,TSx1,RSx1);
+
+            L = 6090; grid_res = 30; T_coh = 1/1000;
+            local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
+
+            sx1.sx_delay_bin = specular_bin1(1);
+            sx1.sx_doppler_bin = peak_doppler_bin1-1;             % TODO: change to SP dopp bin
+
+            A_eff1 = ddm_Aeff(tx1,rx1,sx1,ddm1,local_dem1,T_coh);
+
+
+
+
+            % Part 4.5: reflectivity and peak reflectivity
+            [refl1,refl_peak1] = ddm_refl(power_analog1,eirp_watt1,rx_gain_db_i1,TSx1,RSx1);
+
+            % Part 4.6: Fresnel coefficient
+
+            
+
+
+            
+
+
 
             % save to variables
             brcs_ddm_peak_bin_delay_row(j,i) = peak_delay_bin1-1;   % minus 1 for 0-based indces
             brcs_ddm_peak_bin_dopp_col(j,i) = peak_doppler_bin1-1;
 
+            brcs_ddm_sp_bin_delay_row(j,i) = specular_bin1(1);
+            brcs_ddm_sp_bin_dopp_col(j,i) = peak_doppler_bin1-1;    % TODO: specular_bin1(2);
+            sp_delay_error(j,i) = specular_bin1(3);
+            sp_dopp_error(j,i) = 0;                                 % TODO: specular_bin1(4);
+            
+            zenith_code_phase(j,i) = zenith_code_phase1;
+
+            confidence_flag(j,i) = confidence_flag1;
+
+            brcs(:,:,j,i) = brcs1;
+            A_eff(:,:,j,i) = A_eff1;
+
+            surface_reflectivity(:,:,j,i) = refl1;
+            surface_reflectivity_peak(j,i) = refl_peak1;
 
 
         end

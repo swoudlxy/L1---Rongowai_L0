@@ -3,9 +3,10 @@
 % Fresnel dimension is computed only the DDM is classified as coherent
 % reflection.
 
-function [fresnel_major,fresnel_minor,fresnel_orientation] = fresnel(tx,rx,sx_pos_xyz,inc_angle)
+function [fresnel_major,fresnel_minor,fresnel_orientation] = get_fresnel(tx,rx,sx_pos_xyz,inc_angle)
 
 wgs84 = wgs84Ellipsoid('meter');
+eps_ocean = 74.62+1j*51.92;         % complex permittivity of ocean
 
 % sparse structures
 tx_pos_xyz = tx.tx_pos_xyz;

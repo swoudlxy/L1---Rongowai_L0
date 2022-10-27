@@ -10,7 +10,7 @@
 % 1) fine-tuned SP coordiantes in ECEF-XYZ, and
 % 2) local incidence angle
 
-function [sx_xyz_final,theta_i] = finetune_ocean(tx_pos_xyz,rx_pos_xyz,sp_lla_coarse,model,L,res_grid)
+function [sx_xyz_final] = finetune_ocean(tx_pos_xyz,rx_pos_xyz,sp_lla_coarse,model,L,res_grid)
 
 %derive SP on the ocean surface
 res = 1000;
@@ -29,5 +29,5 @@ sx_lla_final = sp_temp;                                 %finalised sp in lla
 sx_xyz_final = lla2ecef(sx_lla_final);                  %finalised sp in ecef-xyz
 
 %derive incidence angle
-rsx = rx_pos_xyz-sx_xyz_final;
-theta_i = acosd(dot(rsx,sx_xyz_final)/(norm(rsx)*norm(sx_xyz_final)));
+%rsx = rx_pos_xyz-sx_xyz_final;
+%theta_i = acosd(dot(rsx,sx_xyz_final)/(norm(rsx)*norm(sx_xyz_final)));

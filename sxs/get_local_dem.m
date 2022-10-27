@@ -1,60 +1,50 @@
 % this function outputs the local DEM data around the local coordinate P
 % P - LLA coordinate
 
-function local_dem = get_local_dem(P,L,dem_res,dem_data1,dem_data2)
+function local_dem = get_local_dem(P,L,res,dem_data,dtu_model,dist_to_coast)
 
+ocean_land_margin = 0;
 lat_P = P(1);   lon_P = P(2);
 
-num_pixel = L/dem_res;
-half_num_pixel = floor(num_pixel/2);
+num_pixels = L/res;
+half_num_pixel = floor(num_pixels/2);
 
 % sparse dem structures
-lat1 = dem_data1.lat;   lon1 = dem_data1.lon;   ele1 = dem_data1.ele;
-lat2 = dem_data2.lat;   lon2 = dem_data2.lon;   ele2 = dem_data2.ele;
+lat = dem_data.lat;
+lon = dem_data.lon;
+ele = dem_data.ele;
 
-% construct a local elevation map from srtm_30
-if (lat_P>=lat1(end-half_num_pixel)) 
-    [~,lat_index] = min(abs(lat1-lat_P));
-    [~,lon_index] = min(abs(lon1-lon_P));
+[~,lat_index] = min(abs(lat-lat_P));
+[~,lon_index] = min(abs(lon-lon_P));
 
-    local_lat = lat1(lat_index-half_num_pixel:lat_index+half_num_pixel);
-    local_lon = lon1(lon_index-half_num_pixel:lon_index+half_num_pixel);
-    local_ele = ele1(lat_index-half_num_pixel:lat_index+half_num_pixel, ...
-        lon_index-half_num_pixel:lon_index+half_num_pixel);
-    
-elseif (lat_P<=lat2(half_num_pixel))
-    [~,lat_index] = min(abs(lat2-lat_P));
-    [~,lon_index] = min(abs(lon2-lon_P));
+%step = lon(2)-lon(1);
+%lat_index = ceil((lat(1)-lat_P)/step);
+%lon_index = ceil((lon_P-lon(1))/step);
 
-    local_lat = lat2(lat_index-half_num_pixel:lat_index+half_num_pixel);
-    local_lon = lon2(lon_index-half_num_pixel:lon_index+half_num_pixel);
-    local_ele = ele2(lat_index-half_num_pixel:lat_index+half_num_pixel, ...
+local_lat = lat(lat_index-half_num_pixel:lat_index+half_num_pixel);
+local_lon = lon(lon_index-half_num_pixel:lon_index+half_num_pixel);
+
+if dist_to_coast > ocean_land_margin
+    local_ele = ele(lat_index-half_num_pixel:lat_index+half_num_pixel, ...
         lon_index-half_num_pixel:lon_index+half_num_pixel);
 
-elseif (lat_P<lat1(end-half_num_pixel)) && (lat_P>=lat1(end))
-    [~,lat_index] = min(abs(lat1-lat_P));
-    [~,lon_index] = min(abs(lon1-lon_P));
-
-    diff = num_pixel-length(lat1(lat_index-half_num_pixel:end));
+else
+    local_ele = zeros(num_pixels);
     
-    local_lat = [lat1(lat_index-half_num_pixel:end) lat2(2:diff+1)];
-    local_lon = lon1(lon_index-half_num_pixel:lon_index+half_num_pixel);
-    local_ele = [ele1(lat_index-half_num_pixel:end,lon_index-half_num_pixel:lon_index+half_num_pixel);
-        ele2(2:diff+1,lon_index-half_num_pixel:lon_index+half_num_pixel)];
+    for i = 1:num_pixels
+        for j = 1:num_pixels
 
-elseif (lat_P>lat2(half_num_pixel)) && (lat_P<=lat2(1))
-    [~,lat_index] = min(abs(lat2-lat_P));
-    [~,lon_index] = min(abs(lon2-lon_P));
+            pixel_lat = local_lat(i);
+            pixel_lon = local_lon(j);
+            pixel_ele = get_map_value(pixel_lat,pixel_lon,dtu_model);
 
-    diff = num_pixel-length(lat2(1:lat_index+half_num_pixel));
-    
-    local_lat = [lat1(end-diff:end-1) lat2(1:lat_index+half_num_pixel)];
-    local_lon = lon2(lon_index-half_num_pixel:lon_index+half_num_pixel);
-    local_ele = [ele1(end-diff:end-1,lon_index-half_num_pixel:lon_index+half_num_pixel);
-        ele2(1:lat_index+half_num_pixel,lon_index-half_num_pixel:lon_index+half_num_pixel)];
+            local_ele(i,j) = pixel_ele;
+
+        end
+    end
 
 end
 
 local_dem.lat = local_lat;
 local_dem.lon = local_lon;
-local_dem.ele = local_ele;
+local_dem.ele = double(local_ele);
