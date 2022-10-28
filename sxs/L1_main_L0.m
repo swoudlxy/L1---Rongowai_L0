@@ -747,7 +747,9 @@ L1_postCal.gps_ant_gain_db_i = gps_ant_gain_db_i;
 %% Part 4B: BRCS/NBRCS, reflectivity, coherent status and fresnel zone
 clc
 
-load('../out/A_eff_all.mat')
+load('../out/A_eff_large.mat')
+A_eff = A_eff_large;
+
 brcs_ddm_peak_bin_delay_row = zeros(J,I)+invalid;
 brcs_ddm_peak_bin_dopp_col = zeros(J,I)+invalid;
 
@@ -1147,6 +1149,14 @@ for i = 1:I
 end
 
 L1_postCal.quality_flags1 = quality_flags1;
+
+%% packet to netCDF
+clc
+
+netCDF_name = '../out/sample1.nc';
+L1_dict = '../dat/L1_dict_final.xlsx';
+
+L1_info = get_netcdf(netCDF_name,L1_dict,L1_postCal);
 
 % L1 calibration ends
 
