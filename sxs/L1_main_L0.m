@@ -747,8 +747,8 @@ L1_postCal.gps_ant_gain_db_i = gps_ant_gain_db_i;
 %% Part 4B: BRCS/NBRCS, reflectivity, coherent status and fresnel zone
 clc
 
-load('../out/A_eff_large.mat')
-A_eff = A_eff_large;
+%load('../out/A_eff_large.mat')
+%A_eff = A_eff_large;
 
 brcs_ddm_peak_bin_delay_row = zeros(J,I)+invalid;
 brcs_ddm_peak_bin_dopp_col = zeros(J,I)+invalid;
@@ -854,14 +854,14 @@ for i = 1:I
             % Part 4.4: brcs, nbrcs, effective area
             brcs1 = ddm_brcs(power_analog1,eirp_watt1,rx_gain_db_i1,TSx1,RSx1);
 
-            %L = 9090; grid_res = 30; T_coh = 1/1000;
-            %local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
+            L = 9090; grid_res = 30; T_coh = 1/1000;
+            local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
 
             sx1.sx_delay_bin = specular_bin1(1);
             sx1.sx_doppler_bin = peak_doppler_bin1-1;             % TODO: change to SP dopp bin
 
-            %A_eff1 = ddm_Aeff(tx1,rx1,sx1,ddm1,local_dem1,T_coh);
-            A_eff1 = A_eff(:,:,j,i);
+            A_eff1 = ddm_Aeff(tx1,rx1,sx1,ddm1,local_dem1,T_coh);
+            %A_eff1 = A_eff(:,:,j,i);
             [nbrcs1,LES1,TES1] = get_ddm_nbrcs(brcs1,A_eff1,sx1);
             
             % Part 4.5: reflectivity and peak reflectivity
