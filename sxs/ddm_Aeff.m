@@ -142,8 +142,16 @@ for i = 1:num_delay_bins
     end
 end
 
+%chi = fftshift(chi);
+
 chi_mag = abs(chi);             % magnitude
 chi2 = chi_mag.*chi_mag;        % chi_square
+%{
+chi2_fft = fft2(chi2);
+DDMA_fft = fft2(DDM_A);
 
+temp = chi2_fft.*DDMA_fft;
+A_eff = ifft2(temp);
+%}
 temp1 = conv2(chi2,DDM_A);      % 2D convlution
 A_eff = temp1(3:7,21:60);       % crop to proper size

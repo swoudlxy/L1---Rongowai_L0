@@ -171,6 +171,32 @@ landmask_filename = 'dist_to_coast_nz_v1.dat';
 
 landmask_nz = get_dist_to_coast_mask([landmask_path landmask_filename]);
 
+% process landcover mask
+lcv_path = '../dat/lcv/';
+lcv_filename = 'lcv.png';
+
+lcv_mask = imread([lcv_path lcv_filename]);
+
+% process inland water mask
+pek_path = '../dat/pek/';
+
+[pek_160E_40S,ref_160E_40S] = readgeoraster([pek_path 'occurrence_160E_40S.tif']);
+[pek_170E_30S,ref_170E_30S] = readgeoraster([pek_path 'occurrence_170E_30S.tif']);
+[pek_170E_40S,ref_170E_40S] = readgeoraster([pek_path 'occurrence_170E_40S.tif']);
+
+water_mask_160E_40S.pek = pek_160E_40S;
+water_mask_160E_40S.ref = ref_160E_40S;
+
+water_mask_170E_30S.pek = pek_170E_30S;
+water_mask_170E_30S.ref = ref_170E_30S;
+
+water_mask_170E_40S.pek = pek_170E_40S;
+water_mask_170E_40S.ref = ref_170E_40S;
+
+water_mask.water_mask_160E_40S = water_mask_160E_40S;
+water_mask.water_mask_170E_30S = water_mask_170E_30S;
+water_mask.water_mask_170E_40S = water_mask_170E_40S;
+
 % load PRN-SV and SV-EIRP(static) LUT
 gps_path = '../dat/gps/';
 SV_PRN_filename = 'PRN_SV_LUT_v1.dat';
@@ -331,6 +357,7 @@ L1_postCal.zenith_ant_data_version = '1';
 L1_postCal.prn_sv_maps_version = '1';
 L1_postCal.gps_eirp_param_version = '7';
 L1_postCal.land_mask_version = '1';
+L1_postCal.surface_type_version = '1';
 L1_postCal.mean_sea_surface_version = '1';
 L1_postCal.per_bin_ant_version = '1';
 
@@ -350,6 +377,9 @@ L1_postCal.ddm = (0:1:J-1)';
 
 L1_postCal.sp_fsw_delay = delay_center_chips;
 L1_postCal.sp_ngrx_dopp = doppler_center_hz;
+
+L1_postCal.add_range_to_sp = add_range_to_sp;
+L1_postCal.add_range_to_sp_pvt = add_range_to_sp_pvt;
 
 L1_postCal.ac_lat = rx_pos_lla(:,1);
 L1_postCal.ac_lon = rx_pos_lla(:,2);
@@ -540,9 +570,9 @@ sx_vel_z = zeros(J,I)+invalid;
 sx_inc_angle = zeros(J,I)+invalid;
 sx_d_snell_angle = zeros(J,I)+invalid;
 dist_to_coast_km = zeros(J,I)+invalid;
+surface_type = zeros(J,I)+invalid;
 
 LOS_flag = zeros(J,I)+invalid;
-%conf_flag = zeros(J,I)+invalid;
 
 tx_to_sp_range = zeros(J,I)+invalid;
 rx_to_sp_range = zeros(J,I)+invalid;
@@ -577,7 +607,7 @@ for i = 1:I
         tx1.tx_pos_xyz = tx_pos_xyz1;
         tx1.tx_vel_xyz = tx_vel_xyz1;
 
-        prn_code1 = prn_code(j,i);
+        trans_id1 = prn_code(j,i);
         sv_num1 = sv_num(j,i);      tx1.sv_num = sv_num1;
 
         ddm_ant1 = ddm_ant(j,i);
@@ -592,6 +622,7 @@ for i = 1:I
                 dem,dtu10,landmask_nz);
             
             sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
+            surface_type1 = get_surf_type(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);
 
             % derive sx velocity
             dt = 1;                                         % time step in second
@@ -599,7 +630,7 @@ for i = 1:I
             rx_pos_xyz_dt = rx_pos_xyz1+dt*rx_vel_xyz1;
             [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem,dtu10,landmask_nz);
 
-            sx_vel_xyz1 = sx_pos_xyz_dt-sx_pos_xyz1;
+            sx_vel_xyz1 = sx_pos_xyz_dt-sx_pos_xyz1;            
 
             % save sx values to variables
             sx_pos_x(j,i) = sx_pos_xyz1(1);
@@ -613,6 +644,7 @@ for i = 1:I
             sx_vel_x(j,i) = sx_vel_xyz1(1);
             sx_vel_y(j,i) = sx_vel_xyz1(2);
             sx_vel_z(j,i) = sx_vel_xyz1(3);
+            surface_type(j,i) = surface_type1;
 
             sx_inc_angle(j,i) = inc_angle_deg1;
             sx_d_snell_angle(j,i) = d_snell_deg1;
@@ -647,11 +679,9 @@ for i = 1:I
                 % derive cross polarisation
                 if ddm_ant1 == 2
                     sx_rx_gain1 = rx_rad1(1);
-                    %cross_pol1 = rx_rad1(1)-rx_rad1(2);
 
                 elseif ddm_ant1 == 3
                     sx_rx_gain1 = rx_rad1(2);
-                    %cross_pol1 = rx_rad1(2)-rx_rad1(1);
 
                 end
 
@@ -691,7 +721,8 @@ L1_postCal.sp_vel_x = sx_vel_x;
 L1_postCal.sp_vel_y = sx_vel_y;
 L1_postCal.sp_vel_z = sx_vel_z;
 
-L1_postCal.sp_dis_to_coast_km = dist_to_coast_km;
+L1_postCal.sp_surface_type = surface_type;
+L1_postCal.sp_dist_to_coast_km = dist_to_coast_km;
 L1_postCal.LOS_flag = LOS_flag;
 
 L1_postCal.rx_to_sp_range = rx_to_sp_range;
@@ -716,6 +747,7 @@ L1_postCal.gps_ant_gain_db_i = gps_ant_gain_db_i;
 %% Part 4B: BRCS/NBRCS, reflectivity, coherent status and fresnel zone
 clc
 
+load('../out/A_eff_all.mat')
 brcs_ddm_peak_bin_delay_row = zeros(J,I)+invalid;
 brcs_ddm_peak_bin_dopp_col = zeros(J,I)+invalid;
 
@@ -730,15 +762,12 @@ confidence_flag = zeros(J,I)+invalid;
 zenith_code_phase = zeros(J,I)+invalid;
 
 brcs = zeros(5,40,J,I)+invalid;
-A_eff = zeros(5,40,J,I)+invalid;
+%A_eff = zeros(5,40,J,I)+invalid;
 
-surface_reflectivity = zeros(5,40,J,I)+invalid;
-surface_reflectivity_peak = zeros(J,I)+invalid;
+norm_refl_waveform = zeros(1,40,J,I)+invalid;
 
-%{
-eff_scatter = zeros(5,40,J,I)+invalid;
 nbrcs_scatter_area = zeros(J,I)+invalid;
-nbrcs = zeros(J,I)+invalid;
+ddm_nbrcs = zeros(J,I)+invalid;
 
 les_scatter_area = zeros(J,I)+invalid;
 ddm_les = zeros(J,I)+invalid;
@@ -749,22 +778,22 @@ ddm_tes = zeros(J,I)+invalid;
 surface_reflectivity = zeros(5,40,J,I)+invalid;
 surface_reflectivity_peak = zeros(J,I)+invalid;
 
-coherent_ratio = zeros(J,I)+invalid;
-coherent_status = zeros(J,I)+invalid;
+fresnel_coeff = zeros(J,I)+invalid;
+fresnel_minor = zeros(J,I)+invalid;
+fresnel_major = zeros(J,I)+invalid;
+fresnel_orientation = zeros(J,I)+invalid;
 
-fresnel_minor = zeros(5,40,J,I)+invalid;
-fresnel_major = zeros(5,40,J,I)+invalid;
-fresnel_orientation = zeros(5,40,J,I)+invalid;
-%}
+coherency_ratio = zeros(J,I)+invalid;
+coherency_state = zeros(J,I)+invalid;
 
-for i = 1:I %501
+for i = 1:I
 
     % retrieve rx positions and velocities
     rx_pos_xyz1 = rx_pos_xyz(i,:);          rx1.rx_pos_xyz = rx_pos_xyz1;
     rx_vel_xyz1 = rx_vel_xyz(i,:);          rx1.rx_vel_xyz = rx_vel_xyz1;
     rx_clk_drift1 = rx_clk_drift_mps(i,:);  rx1.rx_clk_drift = rx_clk_drift1;
 
-    for j = 1:J %2
+    for j = 1:J
 
         % retrieve tx positions and velocities
         tx_pos_xyz1 = [tx_pos_x(j,i) tx_pos_y(j,i) tx_pos_z(j,i)];
@@ -787,6 +816,9 @@ for i = 1:I %501
         rx_gain_db_i1 = sx_rx_gain(j,i);
         TSx1 = tx_to_sp_range(j,i);
         RSx1 = rx_to_sp_range(j,i);
+
+        inc_angle1 = sx_inc_angle(j,i);
+        ddm_ant1 = ddm_ant(j,i); 
 
         % retrieve ddm-related variables
         raw_counts1 = raw_counts(:,:,j,i);          ddm1.raw_counts = raw_counts1;
@@ -816,33 +848,33 @@ for i = 1:I %501
             % TODO: correct doppler col and error to correct values once
             % center doppler values are correct
             [specular_bin1,zenith_code_phase1,confidence_flag1] = get_specular_bin(tx1,rx1,sx1,ddm1);
-
+            
             % Part 4.4: brcs, nbrcs, effective area
             brcs1 = ddm_brcs(power_analog1,eirp_watt1,rx_gain_db_i1,TSx1,RSx1);
 
-            L = 6090; grid_res = 30; T_coh = 1/1000;
-            local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
+            %L = 9090; grid_res = 30; T_coh = 1/1000;
+            %local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
 
             sx1.sx_delay_bin = specular_bin1(1);
             sx1.sx_doppler_bin = peak_doppler_bin1-1;             % TODO: change to SP dopp bin
 
-            A_eff1 = ddm_Aeff(tx1,rx1,sx1,ddm1,local_dem1,T_coh);
-
-
-
-
+            %A_eff1 = ddm_Aeff(tx1,rx1,sx1,ddm1,local_dem1,T_coh);
+            A_eff1 = A_eff(:,:,j,i);
+            [nbrcs1,LES1,TES1] = get_ddm_nbrcs(brcs1,A_eff1,sx1);
+            
             % Part 4.5: reflectivity and peak reflectivity
             [refl1,refl_peak1] = ddm_refl(power_analog1,eirp_watt1,rx_gain_db_i1,TSx1,RSx1);
 
-            % Part 4.6: Fresnel coefficient
+            % Part 4.6: Fresnel coefficient and dimensions
+            [fresnel_coeff1,fresnel_axis1,fresnel_orientation1] = get_fresnel(tx1,rx1,sx1,inc_angle1,ddm_ant1);
 
+            % Part 4.7: coherent status
+            [CR1,CS1] = coh_det(raw_counts1,snr_db1);
+
+            % normalised reflected waveform
+            refl_waveform1 = sum(raw_counts1,1);
+            norm_refl_waveform1 = refl_waveform1/max(refl_waveform1);
             
-
-
-            
-
-
-
             % save to variables
             brcs_ddm_peak_bin_delay_row(j,i) = peak_delay_bin1-1;   % minus 1 for 0-based indces
             brcs_ddm_peak_bin_dopp_col(j,i) = peak_doppler_bin1-1;
@@ -857,176 +889,264 @@ for i = 1:I %501
             confidence_flag(j,i) = confidence_flag1;
 
             brcs(:,:,j,i) = brcs1;
-            A_eff(:,:,j,i) = A_eff1;
+            %A_eff(:,:,j,i) = A_eff1;
+            
+            nbrcs_scatter_area(j,i) = nbrcs1.nbrcs_scatter;
+            ddm_nbrcs(j,i) = nbrcs1.nbrcs_value;
+
+            les_scatter_area(j,i) = LES1.LES_scatter;
+            ddm_les(j,i) = LES1.LES_slope;
+
+            tes_scatter_area(j,i) = TES1.TES_scatter;
+            ddm_tes(j,i) = TES1.TES_slope;
 
             surface_reflectivity(:,:,j,i) = refl1;
             surface_reflectivity_peak(j,i) = refl_peak1;
 
+            fresnel_coeff(j,i) = fresnel_coeff1;
+            fresnel_major(j,i) = fresnel_axis1(1);
+            fresnel_minor(j,i) = fresnel_axis1(2);
+            fresnel_orientation(j,i) = fresnel_orientation1;
+
+            coherency_ratio(j,i) = CR1;
+            coherency_state(j,i) = CS1;
+
+            norm_refl_waveform(:,:,j,i) = norm_refl_waveform1;
 
         end
 
     end
 end
 
+L1_postCal.brcs_ddm_peak_bin_delay_row = brcs_ddm_peak_bin_delay_row;
+L1_postCal.brcs_ddm_peak_bin_dopp_col = brcs_ddm_peak_bin_dopp_col;
 
-%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% this is part is for the variables that may need the value from a previous
-% or a future timestamp, including the sx velocity and also quality flags
+L1_postCal.brcs_ddm_sp_bin_delay_row = brcs_ddm_sp_bin_delay_row;
+L1_postCal.brcs_ddm_sp_bin_dopp_col = brcs_ddm_sp_bin_dopp_col;
+
+L1_postCal.sp_delay_error = sp_delay_error;
+L1_postCal.sp_dopp_error = sp_dopp_error;  
+L1_postCal.sp_ngrx_delay_correction = sp_delay_error;
+L1_postCal.sp_ngrx_dopp_correction = sp_dopp_error;
+
+L1_postCal.zenith_code_phase = zenith_code_phase;
+
+L1_postCal.confidence_flag = confidence_flag;
+
+L1_postCal.brcs = brcs;
+L1_postCal.eff_scatter = A_eff;
+
+L1_postCal.nbrcs_scatter_area = nbrcs_scatter_area;
+L1_postCal.ddm_nbrcs = ddm_nbrcs;
+
+L1_postCal.les_scatter_area = les_scatter_area;
+L1_postCal.ddm_les = ddm_les;
+
+L1_postCal.tes_scatter_area = tes_scatter_area;
+L1_postCal.ddm_tes = ddm_tes;
+
+L1_postCal.surface_reflectivity = surface_reflectivity;
+L1_postCal.surface_reflectivity_peak = surface_reflectivity_peak;
+
+L1_postCal.fresnel_coeff = fresnel_coeff;
+L1_postCal.fresnel_major = fresnel_major;
+L1_postCal.fresnel_minor = fresnel_minor;
+L1_postCal.fresnel_orientation = fresnel_orientation;
+
+L1_postCal.coherency_ratio = coherency_ratio;
+L1_postCal.coherency_state = coherency_state;
+
+L1_postCal.norm_refl_waveform = norm_refl_waveform;
+
+%% Cross Pol
 clc
 
+cross_pol = zeros(J,I)+invalid;
+
 for i = 1:I
+    for j = 1:J/2
 
-    timestamp1 = L1_postCal(i).ddm_timestamp_utc;
-    timestamp2 = L1_postCal(i+1).ddm_timestamp_utc;
+        power_analog_L = power_analog(:,:,j,i);     max_power_L = max(max(power_analog_L));
+        power_analog_R = power_analog(:,:,j+10,i);  max_power_R = max(max(power_analog_R));
 
-    sx_pos_xyz1 = [ L1_postCal(i).sp_pos_x
-                    L1_postCal(i).sp_pos_y
-                    L1_postCal(i).sp_pos_z];
+        CP1 = max_power_L/max_power_R;
+        CP_db1 = pow2db(CP1);
 
-    sx_pos_xyz2 = [ L1_postCal(i+1).sp_pos_x
-                    L1_postCal(i+1).sp_pos_y
-                    L1_postCal(i+1).sp_pos_z];
-
-    if (all(sx_pos_xyz1(:) == [-999,-999,-999])) || ...
-            (all(sx_pos_xyz2(:) == [-999,-999,-999]))
-        sx_vel_xyz = [-999 -999 -999];
-    else
-        sx_vel_xyz = (sx_pos_xyz2-sx_pos_xyz1)/(timestamp2-timestamp1);
-    end
-
-    L1_postCal(i).sx_vel_x = sx_vel_xyz(1);
-    L1_postCal(i).sx_vel_y = sx_vel_xyz(2);
-    L1_postCal(i).sx_vel_z = sx_vel_xyz(3);
-
-    % intialise quality flag1
-    quality_flag1 = zeros(29,1);
-
-    % small and large sc attitude error
-    roll = abs(L1_postCal(i).ac_roll);
-    pitch = abs(L1_postCal(i).ac_pitch);
-    yaw = abs(L1_postCal(i).ac_yaw);
-
-    if (roll >= 30) || (pitch >= 10) || (yaw >= 5)
-        quality_flag1(4) = 1;
-    else
-        quality_flag1(3) = 1;
-    end
-
-    % low_confidence_ddm_noise_floor and large_step_noise_floor
-    noise_floor1 = L1_postCal(i).noise_floor;
-    noise_floor2 = L1_postCal(i-1).noise_floor;
-
-    noise_diff = abs(noise_floor1-noise_floor2)/noise_floor1;
-    noise_diff_db = abs(pow2db(noise_floor1)-pow2db(noise_floor2));
-
-    if noise_diff > 0.1
-        quality_flag1(9) = 1;
-    end
-
-    if noise_diff_db > 0.24
-        quality_flag1(12) = 1;
-    end
-    
-    % sp over land and near land
-    dis_to_coast = L1_postCal(i).dis_to_coast;
-
-    if dis_to_coast >= 0
-        quality_flag1(10) = 1;
-    end
-
-    if dis_to_coast >= -25
-        quality_flag1(11) = 1;
-    end
-
-    % direct signal in ddm
-    delay_dir_chips = L1_postCal(i).add_range_to_sp;
-    delay_center_chips1 = delay_center_chips(i);
-
-    d = delay_dir_chips-delay_center_chips;
-
-    if abs(d) <= 4
-        quality_flag1(14) = 1;
-    end
-
-    % sp_bin_delay_error
-    sp_delay_bin_float = L1_postCal(i).brcs_ddm_sp_bin_delay_row;
-    if (sp_delay_bin_float < 15) || (sp_delay_bin_float > 25)
-        quality_flag1(17) = 1;
-    end    
-    
-    % sp_bin_doppler_error
-    sp_doppler_bin_float = L1_postCal(i).brcs_ddm_sp_bin_doppler_col;
-    if (sp_doppler_bin_float < 2) || (sp_doppler_bin_float > 4)
-        quality_flag1(18) = 1;
-    end    
-    
-    % neg_ddma_brcs
-    brcs = L1_postCal(i).brcs;
-    ddma_brcs = brcs(floor(sp_doppler_bin_float)-1:floor(sp_doppler_bin_float)+1, ...
-        floor(sp_delay_bin_float):floor(sp_delay_bin_float)+4);
-    index = find(ddma_brcs<0);
-
-    if ~isempty(index)
-        quality_flag1(19) = 1;
-    end
-
-    % gps_pvt_sp3_error
-    tx_pos_xyz = [  L1_postCal(i).tx_pos_x
-                    L1_postCal(i).tx_pos_y
-                    L1_postCal(i).tx_pos_z];
-
-    tx_vel_xyz = [  L1_postCal(i).tx_vel_x
-                    L1_postCal(i).tx_vel_y
-                    L1_postCal(i).tx_vel_z];
-
-    if (~all(tx_pos_xyz,'all')) || (~all(tx_vel_xyz,'all'))
-        quality_flag1(20) = 1;
-    end
-    
-    % sp_non_existent_error
-    if all(sx_pos_xyz1(:) == [-999,-999,-999])
-        quality_flag1(21) = 1;
-    end
-
-    % always false for this field
-    quality_flag1(26) = 1;
-    
-    % ac_altitdue_out_of_nominal_range
-    rx_alt = L1_postCal(i).ac_alt;
-    if (rx_alt < 0) || (rx_alt > 15e3)
-        quality_flag1(27) = 1;
-    end
-
-    % overall quality flag
-    if (quality_flag1(2) == 1 || ...
-            quality_flag1(4) == 1 || ...
-            quality_flag1(5) == 1 || ...
-            quality_flag1(6) == 1 || ...
-            quality_flag1(7) == 1 || ...
-            quality_flag1(8) == 1 || ...
-            quality_flag1(12) == 1 || ...
-            quality_flag1(13) == 1 || ...
-            quality_flag1(14) == 1 || ...
-            quality_flag1(15) == 1 || ...
-            quality_flag1(16) == 1 || ...
-            quality_flag1(17) == 1 || ...
-            quality_flag1(18) == 1 || ...
-            quality_flag1(19) == 1 || ...
-            quality_flag1(21) == 1 || ...
-            quality_flag1(22) == 1 || ...
-            quality_flag1(23) == 1 || ...
-            quality_flag1(24) == 1 || ...
-            quality_flag1(25) == 1 || ...
-            quality_flag1(26) == 1 || ...
-            quality_flag1(27) == 1 || ...
-            quality_flag1(28) == 1 || ...
-            quality_flag1(29) == 1)
-        quality_flag1(1) = 1;
+        cross_pol(j,i) = CP_db1;
 
     end
-
 end
+
+cross_pol(11:20,:) = -1*cross_pol(1:10,:);
+L1_postCal.cross_pol = cross_pol;
+L1_postCal.lna_noise_figure = zeros(J,I)+3;
+
+%% Quality Flags
+clc
+
+quality_flags1 = zeros(J,I)+invalid;
+
+for i = 1:I
+    for j = 1:J
+
+        quality_flag1_1 = zeros(1,23);
+
+        % flag 2, 3 and 23
+        rx_roll1 = rx_roll(i);
+        rx_pitch1 = rx_pitch(i);
+        rx_yaw1 = rx_yaw(i);
+    
+        if (rx_roll1 >= 30) || (rx_pitch1 >= 10) || (rx_yaw1 >= 5)
+            quality_flag1_1(3) = 1;
+        else
+            quality_flag1_1(2) = 1;
+        end
+
+        if rx_roll1 > 1
+            quality_flag1_1(23) = 1;
+        end
+
+        % flag 4
+        quality_flag1_1(4) = 0;
+
+        % flag 5 and 6
+        trans_id1 = transmitter_id(j,i);
+        if trans_id1 == 0
+            quality_flag1_1(5) = 1;
+        end
+
+        if trans_id1 == 28
+            quality_flag1_1(6) = 1;
+        end
+
+        % flag 7 and 10
+        snr_db1 = snr_db(j,i);
+
+        if i > 1
+            snr_db2 = snr_db(j,i-1);
+            diff1 = (db2pow(snr_db1)-db2pow(snr_db2))/db2pow(snr_db1);
+            diff2 = snr_db1-snr_db2;
+
+            if abs(diff1) > 0.1
+                quality_flag1_1(7) = 1;
+            end
+
+            if abs(diff2) > 0.24
+                quality_flag1_1(10) = 1;
+            end
+        end
+
+        % flag 8 and 9
+        dist_to_coast1 = dist_to_coast_km(j,i);
+
+        if dist_to_coast1 > 0
+            quality_flag1_1(8) = 1;
+        end
+
+        if dist_to_coast1 > -25
+            quality_flag1_1(9) = 1;
+        end
+
+        % flag 11
+        ant_temp1 = ant_temp_nadir(i);
+        if i > 1
+            ant_temp2 = ant_temp_nadir(i-1);
+            rate = (ant_temp2-ant_temp1)*60;
+
+            if rate > 1
+                quality_flag1_1(11) = 1;
+            end
+
+        end
+
+        % flag 12
+        zenith_code_phase1 = zenith_code_phase(j,i);
+        signal_code_phase1 = delay_correction(meter2chips(add_range_to_sp(j,i)));
+        diff1 = zenith_code_phase1-signal_code_phase1;
+        if diff1 >= 10
+            quality_flag1_1(12) = 1;
+        end
+
+        % flag 15 and 16
+        sp_delay_row = brcs_ddm_sp_bin_delay_row(j,i);
+        sp_dopp_col = brcs_ddm_sp_bin_dopp_col(j,i);
+
+        if (sp_delay_row<15)||(sp_delay_row>35)
+            quality_flag1_1(15) = 1;
+        end
+
+        if (sp_dopp_col<2)||(sp_dopp_col>4)
+            quality_flag1_1(16) = 1;
+        end
+
+        % flag 17
+        if (floor(sp_delay_row) < 38) && (floor(sp_delay_row) > 0) && ...
+                (floor(sp_dopp_col) < 5) && (floor(sp_dopp_col) > 1)
+            brcs_ddma = brcs(floor(sp_dopp_col)-1:floor(sp_dopp_col)+1, ...
+                            floor(sp_delay_row):floor(sp_dopp_col)+3);
+            det = find(brcs_ddma<0);
+            if ~isempty(det)
+                quality_flag1_1(17) = 1;
+            end
+        end
+
+        % flag 18
+        tx_pos_x1 = tx_pos_x(j,i);
+        prn_code1 = prn_code(j,i);
+        if (tx_pos_x1 == 0) && (prn_code1 ~= invalid)
+            quality_flag1_1(18) = 1;
+        end
+
+        % flag 19
+        sx_pos_x1 = sx_pos_x(j,i);
+        if (sx_pos_x1 == invalid) && (prn_code1 ~= invalid)
+            quality_flag1_1(19) = 1;
+        end
+
+        % flag 20
+        rx_gain1 = sx_rx_gain(j,i);
+        if (rx_gain1 == invalid) && (prn_code1 ~= invalid)
+            quality_flag1_1(20) = 1;
+        end
+
+        quality_flag1_1(21) = 1;
+
+        % flag 22
+        rx_alt = rx_pos_lla(i,3);
+        if rx_alt > 15000
+            quality_flag1_1(22) = 1;
+        end
+
+        % flag 1
+        if (quality_flag1_1(3) == 1 || ...
+            quality_flag1_1(4) == 1 || ...
+            quality_flag1_1(5) == 1 || ...
+            quality_flag1_1(6) == 1 || ...
+            quality_flag1_1(7) == 1 || ...
+            quality_flag1_1(10) == 1 || ...
+            quality_flag1_1(11) == 1 || ...
+            quality_flag1_1(12) == 1 || ...
+            quality_flag1_1(13) == 1 || ...
+            quality_flag1_1(14) == 1 || ...
+            quality_flag1_1(15) == 1 || ...
+            quality_flag1_1(16) == 1 || ...
+            quality_flag1_1(17) == 1 || ...
+            quality_flag1_1(18) == 1 || ...
+            quality_flag1_1(20) == 1 || ...
+            quality_flag1_1(23) == 1 || ...
+            quality_flag1_1(22) == 1 || ...
+            quality_flag1_1(23) == 1)
+        
+            quality_flag1_1(1) = 1;
+
+        end
+
+        quality_flags1(j,i) = get_quality_flag(quality_flag1_1);
+        
+    end
+end
+
+L1_postCal.quality_flags1 = quality_flags1;
 
 % L1 calibration ends
 
