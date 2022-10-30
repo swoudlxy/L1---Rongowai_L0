@@ -1,4 +1,4 @@
-function sample_info = get_netcdf(netCDF_name,L1_dict_name,L1_postCal)
+function sample_info = get_netcdf(L1_netCDF_name,L1_dict_name,L1_postCal)
 
 L1_dict = readtable(L1_dict_name);
 L1_dict = string(table2cell(L1_dict));
@@ -6,7 +6,7 @@ L1_dict = string(table2cell(L1_dict));
 field_names = fieldnames(L1_postCal);
 L = length(field_names);
 
-ncid = netcdf.create(netCDF_name,'NETCDF4');
+ncid = netcdf.create(L1_netCDF_name,'NETCDF4');
 
 for l = 1:L
 
@@ -47,12 +47,12 @@ for l = 1:30
     comment = L1_dict(index1,6);
 
     if ~strcmp(unit,'<none>') && strcmp(dimension,'<none>')
-        nccreate(netCDF_name,netCDF_field_name);
-        ncwrite(netCDF_name,netCDF_field_name,val_value);
+        nccreate(L1_netCDF_name,netCDF_field_name);
+        ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
-        ncwriteatt(netCDF_name,netCDF_field_name,'long name',long_name);
-        ncwriteatt(netCDF_name,netCDF_field_name,'units',unit);
-        ncwriteatt(netCDF_name,netCDF_field_name,'comment',comment);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'units',unit);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
     end
 
 end
@@ -73,63 +73,63 @@ comment = L1_dict(index1,6);
     if strcmp(dimension,'sample')
         val_value = cast(val_value,data_type);
 
-        nccreate(netCDF_name,netCDF_field_name, ...
+        nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'sample',sample}, ...
                  'FillValue','disable');
-        ncwrite(netCDF_name,netCDF_field_name,val_value);
+        ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
-        ncwriteatt(netCDF_name,netCDF_field_name,'long name',long_name);
-        ncwriteatt(netCDF_name,netCDF_field_name,'units',unit);
-        ncwriteatt(netCDF_name,netCDF_field_name,'comment',comment);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'units',unit);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
 
     elseif strcmp(dimension,'ddm')
         val_value = cast(val_value,data_type);
 
-        nccreate(netCDF_name,netCDF_field_name, ...
+        nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'ddm',ddm}, ...
                  'FillValue','disable');
-        ncwrite(netCDF_name,netCDF_field_name,val_value);
+        ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
-        ncwriteatt(netCDF_name,netCDF_field_name,'long name',long_name);
-        ncwriteatt(netCDF_name,netCDF_field_name,'units',unit);
-        ncwriteatt(netCDF_name,netCDF_field_name,'comment',comment);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'units',unit);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
 
     elseif strcmp(dimension,'sample, ddm')
         val_value = cast(val_value,data_type);
 
-        nccreate(netCDF_name,netCDF_field_name, ...
+        nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'ddm',ddm,'sample',sample}, ...
                  'FillValue','disable');
-        ncwrite(netCDF_name,netCDF_field_name,val_value);
+        ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
-        ncwriteatt(netCDF_name,netCDF_field_name,'long name',long_name);
-        ncwriteatt(netCDF_name,netCDF_field_name,'units',unit);
-        ncwriteatt(netCDF_name,netCDF_field_name,'comment',comment);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'units',unit);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
 
     elseif strcmp(dimension,'sample, ddm, delay, doppler')
         val_value = cast(val_value,data_type);
 
-        nccreate(netCDF_name,netCDF_field_name, ...
+        nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'doppler',doppler,'delay',delay,'ddm',ddm,'sample',sample}, ...
                  'FillValue','disable');
-        ncwrite(netCDF_name,netCDF_field_name,val_value);
+        ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
-        ncwriteatt(netCDF_name,netCDF_field_name,'long name',long_name);
-        ncwriteatt(netCDF_name,netCDF_field_name,'units',unit);
-        ncwriteatt(netCDF_name,netCDF_field_name,'comment',comment);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'units',unit);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
 
     elseif strcmp(dimension,'sample, ddm, delay')
         val_value = cast(val_value,data_type);
-        nccreate(netCDF_name,netCDF_field_name, ...
+        nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'delay',delay,'ddm',ddm,'sample',sample}, ...
                  'FillValue','disable');
-        ncwrite(netCDF_name,netCDF_field_name,val_value);
+        ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
-        ncwriteatt(netCDF_name,netCDF_field_name,'long name',long_name);
-        ncwriteatt(netCDF_name,netCDF_field_name,'units',unit);
-        ncwriteatt(netCDF_name,netCDF_field_name,'comment',comment);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'units',unit);
+        ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
     end
 
 end
 
-sample_info = ncinfo(netCDF_name);
+sample_info = ncinfo(L1_netCDF_name);
