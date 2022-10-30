@@ -43,6 +43,7 @@ rx_clk_drift_mps_pvt = double(ncread(L0_filename,'/geometry/receiver/rx_clock_dr
 transmitter_id = double(ncread(L0_filename,'/science/ddm/transmitter_id'));
 
 % raw counts and ddm parameters
+first_scale_factor = double(ncread(L0_filename,'/science/ddm/first_scale_factor'));
 raw_counts = double(ncread(L0_filename,'/science/ddm/counts'));                         % raw counts, uncalibrated
 zenith_i2q2 = double(ncread(L0_filename,'/science/ddm/zenith_i2_plus_q2'));             % zenith counts
 
@@ -110,6 +111,7 @@ index2 = ~isnan(transmitter_id(1,:));
 
 transmitter_id = transmitter_id(:,index2);
 
+first_scale_factor = first_scale_factor(:,index2);
 raw_counts = raw_counts(:,:,:,index2); 
 zenith_i2q2 = zenith_i2q2(:,index2);
 
@@ -493,12 +495,12 @@ L1_postCal.track_id = track_id;
 clc
 
 % use the upper most 5 delay rows as the noise floor
-% TODO: first_scale_bin_factor is not implemented
 % TODO: still need to check the ddm_snr
 
 % initialise variables for L1a results
 power_analog = zeros(5,40,J,I)+invalid;
 noise_floor = zeros(J,I)+invalid;
+noise_power = zeros(J,I)+invalid;
 snr_db = zeros(J,I)+invalid;
 
 ddm_ant = zeros(J,I)+invalid;
@@ -515,19 +517,26 @@ for i = 1:I
 
         if ~isnan(rf_source1)
 
+            first_scale_factor1 = first_scale_factor(j,i);
             ANZ_port1 = get_ANZ_port(rf_source1);
-            raw_counts1 = raw_counts(:,:,j,i);                  % raw nadir antenna measurement in counts           
+            raw_counts1 = raw_counts(:,:,j,i);                  % raw nadir antenna measurement in counts
+            raw_counts1 = raw_counts1*first_scale_factor1;
 
             % perform L1a calibration
-            [signal_power_watts1,noise_power_watts1,noise_floor1] = L1a_counts2watts(raw_counts1,ANZ_port1,noise_std1);
-            inst_gain1 = max(raw_counts1,[],'all')/max(signal_power_watts1,[],'all');
+            %[signal_power_watts1,noise_power_watts1,noise_floor1] = L1a_counts2watts(raw_counts1, ...
+            %    ANZ_port1,noise_std1);
+            [signal_power_watts1,noise_power_watts1,noise_floor_counts1] = L1a_counts2watts1(raw_counts1,ANZ_port1);
 
             peak_raw_counts1 = max(raw_counts1,[],'all');
-            snr1 = peak_raw_counts1/noise_floor1;
+            peak_signal_watt1 = max(signal_power_watts1,[],'all');
+            inst_gain1 = peak_raw_counts1/peak_signal_watt1;
+            
+            snr1 = peak_signal_watt1/noise_power_watts1;         
             snr1_db = pow2db(snr1);
 
             power_analog(:,:,j,i) = signal_power_watts1;
-            noise_floor(j,i) = noise_floor1;
+            noise_floor(j,i) = noise_floor_counts1;
+            noise_power (j,i) = noise_power_watts1;
             snr_db(j,i) = snr1_db;
 
             inst_gain(j,i) = inst_gain1;
@@ -764,7 +773,7 @@ confidence_flag = zeros(J,I)+invalid;
 zenith_code_phase = zeros(J,I)+invalid;
 
 brcs = zeros(5,40,J,I)+invalid;
-%A_eff = zeros(5,40,J,I)+invalid;
+A_eff = zeros(5,40,J,I)+invalid;
 
 norm_refl_waveform = zeros(1,40,J,I)+invalid;
 
@@ -854,8 +863,8 @@ for i = 1:I
             % Part 4.4: brcs, nbrcs, effective area
             brcs1 = ddm_brcs(power_analog1,eirp_watt1,rx_gain_db_i1,TSx1,RSx1);
 
-            L = 9090; grid_res = 30; T_coh = 1/1000;
-            local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
+            %L = 9090; grid_res = 30; T_coh = 1/1000;
+            %local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
 
             sx1.sx_delay_bin = specular_bin1(1);
             sx1.sx_doppler_bin = peak_doppler_bin1-1;             % TODO: change to SP dopp bin
