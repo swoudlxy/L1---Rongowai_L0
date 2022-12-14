@@ -22,8 +22,8 @@ num_delay_bins_ddma = 3;
 num_doppler_bins_ddma = 3;
 
 % perform only when sp bins are within DDM region
-if (sx_delay_bin_float < 38) && (sx_delay_bin_float > 0) && ...
-    (sx_doppler_bin_float < 5) && (sx_doppler_bin_float > 1)
+if (sx_delay_bin_float < 37) && (sx_delay_bin_float > 2) && ...
+    (sx_doppler_bin_float < 4) && (sx_doppler_bin_float > 2)
     
     t0 = floor(sx_delay_bin_float);
     dt = sx_delay_bin_float-t0;
@@ -101,7 +101,7 @@ if (max_delay_bin < 37) && (max_doppler_bin < 5) && (max_doppler_bin > 1)
     term1_TES = sum(tau_chips_TES.*y_n);
     term2_TES = sum(tau_chips_TES)*sum(y_n);
     term3_TES = sum(tau_chips_TES.*tau_chips_TES);
-    term4_TES = term3*term3;
+    term4_TES = term3_TES*term3_TES;
 
     alpha_TES = (term1_TES-term2_TES/N)/(term3_TES-term4_TES/N);
     TES_slope = alpha_TES/TES_scatter;
@@ -114,67 +114,6 @@ else
     TES.TES_slope = -9999999;
 
 end
-
-
-
-    %{
-    %sx_doppler_bin = floor(sx_doppler_bin_float);
-    %dopplerOffset_frac = sx_doppler_bin_float-sx_doppler_bin;
-    f0 = floor(sx_doppler_bin_float);
-    df = sx_doppler_bin_float-f0;
-
-    % crop DDMA region
-    ddma_delay_range = sp_delay_bin:sp_delay_bin+num_delay_bin_ddma-1;
-    ddma_doppler_range = sp_doppler_bin-ceil(num_doppler_bin_ddma/2):sp_doppler_bin+ceil(num_doppler_bin_ddma/2);
-
-    nbrcs_scatter = A_eff(ddma_doppler_range,ddma_delay_range);     % one more bin more than DDMA dimension
-
-    % crop brcs region - floating SP bin considered
-    coeff1 = (1-delayOffset_frac)*(1-dopplerOffset_frac);
-    term1 = brcs(sp_doppler_bin-1,sp_delay_bin);
-
-    coeff2 = 1-delayOffset_frac;
-    term2 = [   brcs(sp_doppler_bin,sp_delay_bin), ...
-                brcs(sp_doppler_bin+1,sp_delay_bin)];
-
-    coeff3 = 1-dopplerOffset_frac;
-    term3 = [   brcs(sp_doppler_bin-1,sp_delay_bin+1), ...
-                brcs(sp_doppler_bin-1,sp_delay_bin+2), ...
-                brcs(sp_doppler_bin-1,sp_delay_bin+3), ...
-                brcs(sp_doppler_bin-1,sp_delay_bin+4)];
-
-    coeff4 = delayOffset_frac;
-    term4 = [   brcs(sp_doppler_bin,sp_delay_bin+5), ...
-                brcs(sp_doppler_bin+1,sp_delay_bin+5)];
-
-    coeff5 = dopplerOffset_frac;
-    term5 = [   brcs(sp_doppler_bin+2,sp_delay_bin+1), ...
-                brcs(sp_doppler_bin+2,sp_delay_bin+2), ...
-                brcs(sp_doppler_bin+2,sp_delay_bin+3), ...
-                brcs(sp_doppler_bin+2,sp_delay_bin+4)];
-
-    coeff6 = (1-delayOffset_frac)*dopplerOffset_frac;
-    term6 = brcs(sp_doppler_bin+2,sp_delay_bin);
-
-    coeff7 = delayOffset_frac*(1-dopplerOffset_frac);
-    term7 = brcs(sp_doppler_bin-1,sp_delay_bin+5);
-
-    coeff8 = delayOffset_frac*dopplerOffset_frac;
-    term8 = brcs(sp_doppler_bin-1,sp_delay_bin+5);
-
-    term9 = [   brcs(sp_doppler_bin,sp_delay_bin+1), ...
-                brcs(sp_doppler_bin,sp_delay_bin+2), ...
-                brcs(sp_doppler_bin,sp_delay_bin+3), ...
-                brcs(sp_doppler_bin,sp_delay_bin+4), ...
-                brcs(sp_doppler_bin+1,sp_delay_bin+1), ...
-                brcs(sp_doppler_bin+1,sp_delay_bin+2), ...
-                brcs(sp_doppler_bin+1,sp_delay_bin+3), ...
-                brcs(sp_doppler_bin+1,sp_delay_bin+4)];
-
-    brcs_weighted = sum([   coeff1*sum(term1),coeff2*sum(term2),coeff3*sum(term3), ...
-                            coeff4*sum(term4),coeff5*sum(term5),coeff6*sum(term6), ...
-                            coeff7*sum(term7),coeff8*sum(term8),sum(term9)]);
-    %}
 
     
 

@@ -36,7 +36,7 @@ if LOS_flag == 1
     % step 2 - project to local DEM for land SPs
     if dist > 0
 
-        local_dem = get_local_dem(sx_pos_lla,90,30,dem_data,dtu10,dist);
+        %local_dem = get_local_dem(sx_pos_lla,90,30,dem_data,dtu10,dist);
         local_height = local_dem.ele;
         local_height = local_height(2,2);       % local height of the SP
 
@@ -60,9 +60,9 @@ if LOS_flag == 1
 elseif LOS_flag == 0
 
     %no sx if no LOS between rx and tx
-    sx_pos_xyz = [-99999999,-99999999,-99999999];
-    inc_angle_deg = -99999999;
-    d_snell_deg = -99999999;
-    dist_to_coast_km = -99999999;
+    sx_pos_xyz = [NaN,NaN,NaN];
+    inc_angle_deg = NaN;
+    d_snell_deg = NaN;
+    dist_to_coast_km = NaN;
 
 end

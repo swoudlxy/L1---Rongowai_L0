@@ -38,7 +38,7 @@ zenith_code_phase = delay_correction(zenith_code_phase1,1023);
     tx_vel_xyz,rx_vel_xyz,sx_pos_xyz);
 
 delay_error = add_range_to_sp_chips-pixel_add_range_to_sp_chips;
-sp_delay_row = delay_center_bin-delay_error/delay_resolution;
+sp_delay_row = delay_center_bin+delay_error/delay_resolution;           % cygnss is using "-"
 
 doppler_clk = rx_clk_drift/c;
 pixel_doppler_hz = pixel_doppler_hz+doppler_clk;
@@ -74,6 +74,8 @@ else
         confidence_flag = 3;
     elseif snr_db>=2 && delay_doppler_snell
         confidence_flag = 4;
+    else
+        confidence_flag = nan;
     end
 
 end

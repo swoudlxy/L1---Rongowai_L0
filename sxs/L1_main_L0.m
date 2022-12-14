@@ -13,8 +13,8 @@ clear
 clc
 
 % load L0 netCDF
-path1 = '../dat/raw/';
-L0_filename = [path1 'Flight_4_2022-10-10.nc'];
+path1 = '../dat/raw/route/';
+L0_filename = [path1 '20221114-064502_NZAA-NZPM.nc'];
 
 % PVT GPS week and sec
 pvt_gps_week = double(ncread(L0_filename,'/science/GPS_week_of_SC_attitude'));
@@ -50,10 +50,10 @@ zenith_i2q2 = double(ncread(L0_filename,'/science/ddm/zenith_i2_plus_q2'));     
 rf_source = double(ncread(L0_filename,'/science/ddm/RF_source'));                       % RF source
 ddm_number = double(ncread(L0_filename,'/science/ddm/ddm_number'));
 
-% noise bin average
-noise_std_dev_rf1 = double(ncread(L0_filename,'/science/ddm/RF1_zenith_RHCP_std_dev'));
-noise_std_dev_rf2 = double(ncread(L0_filename,'/science/ddm/RF2_nadir_LHCP_std_dev')); 
-noise_std_dev_rf3 = double(ncread(L0_filename,'/science/ddm/RF3_nadir_RHCP_std_dev'));
+% binning standard deviation
+std_dev_rf1 = double(ncread(L0_filename,'/science/ddm/RF1_zenith_RHCP_std_dev'));
+std_dev_rf2 = double(ncread(L0_filename,'/science/ddm/RF2_nadir_LHCP_std_dev')); 
+std_dev_rf3 = double(ncread(L0_filename,'/science/ddm/RF3_nadir_RHCP_std_dev'));
 
 delay_bin_res = double(ncread(L0_filename,'/science/ddm/delay_bin_res_narrow'));        % delay bin resolution
 doppler_bin_res = double(ncread(L0_filename,'/science/ddm/doppler_bin_res_narrow'));    % doppler bin resolution
@@ -86,8 +86,6 @@ nadir_ant_temp_eng = double(ncread(L0_filename,'/eng/nadir_ant_temp'));
 %% Prelaunch 1.5: Filter valid timestampes
 clc
 
-c = 299792458;                              % speed of light
-
 % rx-related variables
 index1 = ~isnan(pvt_gps_week);
 
@@ -98,7 +96,6 @@ rx_pos_z_pvt = rx_pos_z_pvt(index1);
 
 rx_vel_x_pvt = rx_vel_x_pvt(index1);        rx_vel_y_pvt = rx_vel_y_pvt(index1);
 rx_vel_z_pvt = rx_vel_z_pvt(index1);
-rx_vel_xyz_pvt = [rx_vel_x_pvt rx_vel_y_pvt rx_vel_z_pvt];
 
 rx_roll_pvt = rx_roll_pvt(index1);          rx_pitch_pvt = rx_pitch_pvt(index1);
 rx_yaw_pvt = rx_yaw_pvt(index1);
@@ -118,9 +115,9 @@ zenith_i2q2 = zenith_i2q2(:,index2);
 rf_source = rf_source(:,index2);
 ddm_number = ddm_number(:,index2);
 
-noise_std_dev_rf1 = noise_std_dev_rf1(index2);
-noise_std_dev_rf2 = noise_std_dev_rf2(index2);
-noise_std_dev_rf3 = noise_std_dev_rf3(index2);
+std_dev_rf1 = std_dev_rf1(index2);
+std_dev_rf2 = std_dev_rf2(index2);
+std_dev_rf3 = std_dev_rf3(index2);
 
 delay_bin_res = delay_bin_res(index2);      doppler_bin_res = doppler_bin_res(index2);
 
@@ -128,7 +125,7 @@ delay_center_bin = delay_center_bin(index2);
 doppler_center_bin = doppler_center_bin(index2);
 
 % absolute ddm center delay and doppler
-delay_center_chips = delay_center_chips(:,index2)/c;                    % correction to the chips  
+delay_center_chips = delay_center_chips(:,index2);
 doppler_center_hz = doppler_center_hz(:,index2);
 
 % number of doppler and delay bins
@@ -153,7 +150,13 @@ clc
 
 % define IGS orbits filename (*.sp3)
 % note this path is defined in C++ format
-gps_orbit_filename = '..//dat//orbits//igr22310.sp3';
+gps_orbit_filename = '..//dat//orbits//igr22361.sp3';
+
+% load L1a calibration tables
+L1a_path = '../dat/L1a_cal/';
+
+L1a_cal_ddm_counts_db = readmatrix([L1a_path 'L1A_cal_ddm_counts_dB.dat']);
+L1a_cal_ddm_power_dbm = readmatrix([L1a_path 'L1A_cal_ddm_power_dBm.dat']);
 
 % load SRTM_30 DEM
 dem_path = '../dat/dem/';
@@ -233,12 +236,10 @@ RHCP_pattern.RHCP = RHCP_R_gain_db_i;
 % parameters at ddm timestamps
 clc
 
-invalid = -99999999;                                % defines the value to be used for invalid fields
+invalid = nan;                              % defines the value to be used for invalid fields
 
-I = length(pvt_gps_sec);                            % total length of samples
-J = 20;                                             % maximal NGRx capacity
-
-non_coherent_integrations(isnan(non_coherent_integrations)) = invalid;
+I = length(pvt_gps_sec);                    % total length of samples
+J = 20;                                     % maximal NGRx capacity
 
 % initialise output data array for Part 1 processing
 pvt_utc = zeros(I,1)+invalid;       ddm_utc = zeros(I,1)+invalid;
@@ -374,6 +375,7 @@ L1_postCal.ddm_timestamp_utc = ddm_utc;
 
 L1_postCal.ddm_pvt_bias = ddm_pvt_bias;
 
+% 0-indexed sample and DDM
 L1_postCal.sample = (0:1:I-1)';
 L1_postCal.ddm = (0:1:J-1)';
 
@@ -494,14 +496,17 @@ L1_postCal.track_id = track_id;
 % L1a calibration
 clc
 
-% use the upper most 5 delay rows as the noise floor
-% TODO: still need to check the ddm_snr
+offset = 4;                         % offset delay rows to derive noise floor
 
 % initialise variables for L1a results
 power_analog = zeros(5,40,J,I)+invalid;
 noise_floor = zeros(J,I)+invalid;
-noise_power = zeros(J,I)+invalid;
 snr_db = zeros(J,I)+invalid;
+
+peak_ddm_counts = zeros(J,I)+invalid;
+peak_delay_bin = zeros(J,I)+invalid;
+
+ddm_noise_counts = zeros(J,I)+invalid;
 
 ddm_ant = zeros(J,I)+invalid;
 inst_gain = zeros(J,I)+invalid;
@@ -509,42 +514,96 @@ inst_gain = zeros(J,I)+invalid;
 for i = 1:I
 
     % retrieve noise standard deviation in counts for all three channels
-    noise_std1 = [noise_std_dev_rf1(i),noise_std_dev_rf2(i),noise_std_dev_rf3(i)];
-
+    std_dev1 = [std_dev_rf1(i),std_dev_rf2(i),std_dev_rf3(i)];
+    
     for j = 1:J
 
+        prn_code1 = prn_code(j,i);
         rf_source1 = rf_source(j,i);
 
-        if ~isnan(rf_source1)
+        first_scale_factor1 = first_scale_factor(j,i);
+        raw_counts1 = raw_counts(:,:,j,i);
 
-            first_scale_factor1 = first_scale_factor(j,i);
+        % solve only when presenting a valid PRN and DDM counts
+        if (~isnan(prn_code1)) && (raw_counts1(1,1) ~= raw_counts1(3,21))
+
             ANZ_port1 = get_ANZ_port(rf_source1);
-            raw_counts1 = raw_counts(:,:,j,i);                  % raw nadir antenna measurement in counts
-            raw_counts1 = raw_counts1*first_scale_factor1;
+            ddm_power_counts1 = raw_counts1*first_scale_factor1;
 
-            % perform L1a calibration
-            %[signal_power_watts1,noise_power_watts1,noise_floor1] = L1a_counts2watts(raw_counts1, ...
-            %    ANZ_port1,noise_std1);
-            [signal_power_watts1,noise_power_watts1,noise_floor_counts1] = L1a_counts2watts1(raw_counts1,ANZ_port1);
+            % perform L1a calibration from Counts to Watts
+            ddm_power_watts1 = L1a_counts2watts(ddm_power_counts1,ANZ_port1, ...
+                L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm,std_dev1);
 
-            peak_raw_counts1 = max(raw_counts1,[],'all');
-            peak_signal_watt1 = max(signal_power_watts1,[],'all');
-            inst_gain1 = peak_raw_counts1/peak_signal_watt1;
+            % noise floor
+            ddm_noise_counts1 = mean(ddm_power_counts1(:,end-offset:end),'all');
+
+            % peak ddm location
+            peak_ddm_counts1 = max(max(ddm_power_counts1));
+            [~,peak_delay_bin1] = find(ddm_power_counts1==peak_ddm_counts1);
+
+            peak_ddm_watts1 = max(max(ddm_power_watts1));            
+            inst_gain1 = peak_ddm_counts1/peak_ddm_watts1;      % instrument gain
             
-            snr1 = peak_signal_watt1/noise_power_watts1;         
-            snr1_db = pow2db(snr1);
-
-            power_analog(:,:,j,i) = signal_power_watts1;
-            noise_floor(j,i) = noise_floor_counts1;
-            noise_power (j,i) = noise_power_watts1;
-            snr_db(j,i) = snr1_db;
+            % save variables
+            power_analog(:,:,j,i) = ddm_power_watts1;
 
             inst_gain(j,i) = inst_gain1;
-            ddm_ant(j,i) = ANZ_port1;            
+            ddm_ant(j,i) = ANZ_port1;
+
+            ddm_noise_counts(j,i) = ddm_noise_counts1;
+
+            peak_ddm_counts(j,i) = peak_ddm_counts1;
+            peak_delay_bin(j,i) = peak_delay_bin1;
 
         end
         
     end    
+end
+
+% derive signal power and noise floor
+for i = 1:I
+
+    noise_counts_LHCP1 = ddm_noise_counts(1:J/2,i);       
+    peak_delay_bin_LHCP1 = peak_delay_bin(1:J/2,i);
+
+    noise_counts_RHCP1 = ddm_noise_counts(J/2+1:J,i);
+    peak_delay_bin_RHCP1 = peak_delay_bin(J/2+1:J,i);
+
+    noise_index_LHCP = find(peak_delay_bin_LHCP1<31 & peak_delay_bin_LHCP1>0);
+    noise_index_RHCP = find(peak_delay_bin_RHCP1<31 & peak_delay_bin_RHCP1>0);
+
+    if ~isempty(noise_index_LHCP)
+        avg_noise_counts_LHCP1 = mean(noise_counts_LHCP1(noise_index_LHCP));
+        avg_noise_counts_RHCP1 = mean(noise_counts_RHCP1(noise_index_RHCP));
+
+    elseif (isempty(noise_index_LHCP)) && (sum(~isnan(noise_counts_LHCP1)) > 0)
+        avg_noise_counts_LHCP1 = noise_floor(j,i-1);
+        avg_noise_counts_RHCP1 = noise_floor(j+J/2,i-1);
+
+    end
+
+    for j = 1:J/2
+
+        peak_power_counts_LHCP1 = peak_ddm_counts(j,i);
+        peak_power_counts_RHCP1 = peak_ddm_counts(j+J/2,i);
+
+        if ~isnan(peak_power_counts_LHCP1)
+
+            snr_LHCP1 = peak_power_counts_LHCP1/avg_noise_counts_LHCP1;
+            snr_db_LHCP1 = pow2db(snr_LHCP1);
+
+            snr_RHCP1 = peak_power_counts_RHCP1/avg_noise_counts_RHCP1;
+            snr_db_RHCP1 = pow2db(snr_RHCP1);
+
+            % save variables
+            noise_floor(j,i) = avg_noise_counts_LHCP1;
+            noise_floor(j+J/2,i) = avg_noise_counts_RHCP1;
+
+            snr_db(j,i) = snr_db_LHCP1;
+            snr_db(j+J/2,i) = snr_db_RHCP1;
+
+        end
+    end
 end
 
 % save outputs to L1 structure
@@ -599,7 +658,6 @@ gps_ant_gain_db_i = zeros(J,I)+invalid;
 static_gps_eirp = zeros(J,I)+invalid;
 
 sx_rx_gain = zeros(J,I)+invalid;
-%cross_pol = zeros(J,I)+invalid;
 
 for i = 1:I
 
@@ -617,12 +675,12 @@ for i = 1:I
         tx1.tx_vel_xyz = tx_vel_xyz1;
 
         trans_id1 = prn_code(j,i);
-        sv_num1 = sv_num(j,i);      tx1.sv_num = sv_num1;
+        sv_num1 = sv_num(j,i);          tx1.sv_num = sv_num1;
 
         ddm_ant1 = ddm_ant(j,i);
 
         % only process these with valid svn code
-        if sv_num1 ~= invalid
+        if ~isnan(ddm_ant1)
 
             % Part 4.1: SP solver
             % derive SP positions, angle of incidence and distance
@@ -756,8 +814,8 @@ L1_postCal.gps_ant_gain_db_i = gps_ant_gain_db_i;
 %% Part 4B: BRCS/NBRCS, reflectivity, coherent status and fresnel zone
 clc
 
-%load('../out/A_eff_large.mat')
-%A_eff = A_eff_large;
+%load('../out/A_eff.mat')
+load('../dat/dem/phy_ele_size.mat')
 
 brcs_ddm_peak_bin_delay_row = zeros(J,I)+invalid;
 brcs_ddm_peak_bin_dopp_col = zeros(J,I)+invalid;
@@ -774,6 +832,7 @@ zenith_code_phase = zeros(J,I)+invalid;
 
 brcs = zeros(5,40,J,I)+invalid;
 A_eff = zeros(5,40,J,I)+invalid;
+A_eff_all = zeros(9,79,J,I)+invalid;
 
 norm_refl_waveform = zeros(1,40,J,I)+invalid;
 
@@ -846,30 +905,29 @@ for i = 1:I
         T_coh1 = coherent_duration(i);
         ddm1.T_coh = T_coh1;
 
-        ddm1.delay_resolution = 0.25;   ddm1.num_delay_bins = 40;   ddm1.delay_center_bin = 19;
+        ddm1.delay_resolution = 0.25;   ddm1.num_delay_bins = 40;   ddm1.delay_center_bin = 20;
         ddm1.doppler_resolution = 500;  ddm1.num_doppler_bins = 5;  ddm1.doppler_center_bin = 2;
         
-        if (tx_pos_x(j,i) ~= invalid) && (sum(raw_counts1,'all')~=0)
+        if ~isnan(tx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
             
             % Part 4.3: SP-related variables - 2
-            % this part derives confidence, bin locations of SP
+            % this part derives confidence and floating bin locations of SP
             raw_counts_max = max(raw_counts1,[],'all');
             [peak_doppler_bin1,peak_delay_bin1] = find(raw_counts1 == raw_counts_max,1);
 
-            % TODO: correct doppler col and error to correct values once
-            % center doppler values are correct
             [specular_bin1,zenith_code_phase1,confidence_flag1] = get_specular_bin(tx1,rx1,sx1,ddm1);
             
             % Part 4.4: brcs, nbrcs, effective area
             brcs1 = ddm_brcs(power_analog1,eirp_watt1,rx_gain_db_i1,TSx1,RSx1);
 
-            %L = 9090; grid_res = 30; T_coh = 1/1000;
-            %local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
+            L = 12600; grid_res = 30; T_coh = 1/1000;
+            local_dem1 = get_local_dem(sx_pos_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
 
             sx1.sx_delay_bin = specular_bin1(1);
-            sx1.sx_doppler_bin = peak_doppler_bin1-1;             % TODO: change to SP dopp bin
+            sx1.sx_doppler_bin = specular_bin1(2);
 
-            A_eff1 = ddm_Aeff(tx1,rx1,sx1,ddm1,local_dem1,T_coh);
+            [A_eff1,A_eff_all1] = get_ddm_Aeff(tx1,rx1,sx1,ddm1,local_dem1,T_coh,phy_ele_size);
+           
             %A_eff1 = A_eff(:,:,j,i);
             [nbrcs1,LES1,TES1] = get_ddm_nbrcs(brcs1,A_eff1,sx1);
             
@@ -891,16 +949,17 @@ for i = 1:I
             brcs_ddm_peak_bin_dopp_col(j,i) = peak_doppler_bin1-1;
 
             brcs_ddm_sp_bin_delay_row(j,i) = specular_bin1(1);
-            brcs_ddm_sp_bin_dopp_col(j,i) = peak_doppler_bin1-1;    % TODO: specular_bin1(2);
+            brcs_ddm_sp_bin_dopp_col(j,i) = specular_bin1(2);
             sp_delay_error(j,i) = specular_bin1(3);
-            sp_dopp_error(j,i) = 0;                                 % TODO: specular_bin1(4);
+            sp_dopp_error(j,i) = specular_bin1(4);
             
             zenith_code_phase(j,i) = zenith_code_phase1;
 
             confidence_flag(j,i) = confidence_flag1;
 
             brcs(:,:,j,i) = brcs1;
-            %A_eff(:,:,j,i) = A_eff1;
+            A_eff(:,:,j,i) = A_eff1;
+            A_eff_all(:,:,j,i) = A_eff_all1;
             
             nbrcs_scatter_area(j,i) = nbrcs1.nbrcs_scatter;
             ddm_nbrcs(j,i) = nbrcs1.nbrcs_value;
@@ -925,7 +984,7 @@ for i = 1:I
             norm_refl_waveform(:,:,j,i) = norm_refl_waveform1;
 
         end
-
+        
     end
 end
 
@@ -1104,19 +1163,19 @@ for i = 1:I
         % flag 18
         tx_pos_x1 = tx_pos_x(j,i);
         prn_code1 = prn_code(j,i);
-        if (tx_pos_x1 == 0) && (prn_code1 ~= invalid)
+        if (tx_pos_x1 == 0) && (~isnan(prn_code1))
             quality_flag1_1(18) = 1;
         end
 
         % flag 19
         sx_pos_x1 = sx_pos_x(j,i);
-        if (sx_pos_x1 == invalid) && (prn_code1 ~= invalid)
+        if (sx_pos_x1 == invalid) && (~isnan(prn_code1))
             quality_flag1_1(19) = 1;
         end
 
         % flag 20
         rx_gain1 = sx_rx_gain(j,i);
-        if (rx_gain1 == invalid) && (prn_code1 ~= invalid)
+        if (rx_gain1 == invalid) && (~isnan(prn_code1))
             quality_flag1_1(20) = 1;
         end
 
@@ -1159,13 +1218,15 @@ end
 
 L1_postCal.quality_flags1 = quality_flags1;
 
+%save('../out/L1_postCal_ver2.mat','L1_postCal')
+
 %% packet to netCDF
-clc
+%clc
 
-netCDF_name = '../out/sample1.nc';
-L1_dict = '../dat/L1_dict_final.xlsx';
+%netCDF_name = '../out/sample1.nc';
+%L1_dict = '../dat/L1_dict_final.xlsx';
 
-L1_info = get_netcdf(netCDF_name,L1_dict,L1_postCal);
+%L1_info = get_netcdf(netCDF_name,L1_dict,L1_postCal);
 
 % L1 calibration ends
 

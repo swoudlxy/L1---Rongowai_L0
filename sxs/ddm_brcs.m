@@ -17,8 +17,11 @@ lambda2 = lambda*lambda;
 
 rx_gain = db2pow(rx_gain_db_i);     % linear rx gain
 
-term1 = (4*pi)^3/lambda2;
-term2 = (TSx*RSx)^2;
-term3 = eirp_watt*rx_gain;
+term1 = eirp_watt*rx_gain;
 
-brcs = power_analog*term1*term2/term3;
+term2_1 = TSx*RSx;
+term2 = 1/(term2_1*term2_1);
+
+power_factor = lambda2*term1*term2/((4*pi)^3);
+
+brcs = power_analog/power_factor;

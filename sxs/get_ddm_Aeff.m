@@ -1,0 +1,173 @@
+% this function computes the effective scattering area at the given surface
+% Inputs:
+% 1) tx, rx: tx and rx structures
+% 2) sx_pos_xyz: ecef position of specular points
+% 3) ddm: ddm structure
+% 4) local_dem: local region centred at sx
+% 5) T_coh: coherent integration duration
+% Output:
+% 1) A_eff: effective scattering area
+% 2) sp_delay_bin,sp_doppler_bin: floating specular bin
+
+function [A_eff,A_eff_all] = get_ddm_Aeff(tx,rx,sx,ddm,local_dem,T_coh,phy_ele_size)
+
+chip_rate = 1.023e6;
+tau_c = 1/chip_rate;
+
+delay_res = 0.25;
+doppler_res = 500;
+
+% sparse structures
+tx_pos_xyz = tx.tx_pos_xyz;
+tx_vel_xyz = tx.tx_vel_xyz;
+
+rx_pos_xyz = rx.rx_pos_xyz;
+rx_vel_xyz = rx.rx_vel_xyz;
+
+sx_pos_xyz = sx.sx_pos_xyz;
+sx_pos_lla = ecef2lla(sx_pos_xyz);
+
+sx_delay_bin = sx.sx_delay_bin+1;               % need to fix all 0-indexed bin to 1-indexed
+sx_doppler_bin = sx.sx_doppler_bin+1;
+
+num_delay_bins = ddm.num_delay_bins;
+num_doppler_bins = ddm.num_doppler_bins;
+
+delay_center_bin = ddm.delay_center_bin+1;
+doppler_center_bin = ddm.doppler_center_bin+1;
+
+d_delay = ddm.delay_resolution;
+d_doppler = ddm.doppler_resolution;
+
+% sparse local_dem structure
+local_lat = local_dem.lat;
+local_lon = local_dem.lon;
+local_ele = local_dem.ele;
+
+num_grids = length(local_lat);
+
+% derive ambiguity function - chi
+chi = zeros(num_doppler_bins,num_delay_bins);
+
+for i = 1:num_delay_bins
+    for j = 1:num_doppler_bins
+
+        dtau = (i-delay_center_bin)*d_delay*tau_c;      % dtau in second
+        dfreq = (j-doppler_center_bin)*d_doppler;       % dfreq in Hz
+
+        % compute complex AF value at each delay-doppler bin
+        chi(j,i) = get_amb_fun(dtau,dfreq,tau_c,T_coh);
+    
+    end
+end
+
+chi_mag = abs(chi);             % magnitude
+chi2 = chi_mag.*chi_mag;        % chi_square
+
+% get coarsen local_dem
+sample_rate = 20;
+
+lat_coarse = local_lat(ceil(sample_rate/2):sample_rate:end);
+lon_coarse = local_lon(ceil(sample_rate/2):sample_rate:end);
+ele_coarse = local_ele(ceil(sample_rate/2):sample_rate:end, ...
+    ceil(sample_rate/2):sample_rate:end);
+
+num_grids_coarse = length(lat_coarse);
+
+% get delay-doppler map over the surface
+delay_coarse = zeros(num_grids_coarse);        
+doppler_coarse = zeros(num_grids_coarse);
+
+[delay_chips_sx,doppler_Hz_sx] = deldop(tx_pos_xyz,rx_pos_xyz, ...
+    tx_vel_xyz,rx_vel_xyz,sx_pos_xyz);
+
+for m = 1:num_grids_coarse
+    for n = 1:num_grids_coarse
+                    
+        p_pos_lla1 = [lat_coarse(m) lon_coarse(n) ele_coarse(m,n)];
+        p_pos_xyz1 = lla2ecef(p_pos_lla1);
+        
+        [delay_p1,doppler_p1,~] = deldop(tx_pos_xyz,rx_pos_xyz, ...
+            tx_vel_xyz,rx_vel_xyz,p_pos_xyz1);
+
+        delay_coarse(m,n) = delay_p1-delay_chips_sx;
+        doppler_coarse(m,n) = doppler_p1-doppler_Hz_sx;
+                                        
+    end
+end
+
+% interpolate to 30-m resolution
+delay_chips = interp2(lon_coarse,lat_coarse',delay_coarse, ...
+    local_lon,local_lat','spline');
+doppler_Hz = interp2(lon_coarse,lat_coarse',doppler_coarse, ...
+    local_lon,local_lat','spline');
+
+% get physical size
+sx_pos_lat = sx_pos_lla(1);
+[~,idx_lat] = min(abs(phy_ele_size(:,1)-sx_pos_lat));
+dA = phy_ele_size(idx_lat-floor(num_grids/2):idx_lat+floor(num_grids/2),2);
+
+dA = repmat(dA,1,num_grids);
+
+% construct physical size DDM
+A_phy = zeros(5,40);
+     
+% bin to physical size DDM
+for m = 1:num_grids
+    for n = 1:num_grids
+
+        delay_bin_idx1 = floor(-1*delay_chips(m,n)/delay_res+sx_delay_bin);
+        doppler_bin_idx1 = floor(doppler_Hz(m,n)/doppler_res+sx_doppler_bin);
+
+        %delay_bin_idx1 = floor(-1*delay_chips(m,n)/delay_res+sx_delay_bin);
+        %doppler_bin_idx1 = floor(1*doppler_hz(m,n)/doppler_res+sx_doppler_bin);
+
+        if (delay_bin_idx1>=1) && (delay_bin_idx1<=40) && ...
+                (doppler_bin_idx1>=1) && (doppler_bin_idx1<=5)
+
+            temp = A_phy(doppler_bin_idx1,delay_bin_idx1);
+            temp = temp+dA(m,n);
+            A_phy(doppler_bin_idx1,delay_bin_idx1) = temp;
+
+        end
+
+    end
+end
+
+% convolution to A_eff
+A_eff1 = conv2(A_phy,chi2);
+A_eff = A_eff1(3:7,17:56);
+A_eff_all = A_eff1;
+
+
+%chi2_fft = fft2(fftshift(chi2));
+%A_phy_fft = fft2(A_phy);
+%A_eff_fft = chi2_fft.*A_phy_fft;
+
+%A_eff = ifft2(A_eff_fft);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
