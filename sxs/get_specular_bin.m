@@ -1,5 +1,7 @@
-% this function derives the confidence flag for the computed SP and also
-% the zenith code phase directly tracked by the NGRx
+% this function derives the 
+% 1) precise SP bin location in the DDM - 0-indexed
+% 2) confidence flag for the computed SP and also
+% 3) zenith code phase directly tracked by the NGRx
 
 function [specular_bin,zenith_code_phase,confidence_flag] = get_specular_bin(tx,rx,sx,ddm)
 
@@ -34,7 +36,7 @@ zenith_code_phase1 = delay_center_chips+add_range_to_sp_chips;
 zenith_code_phase = delay_correction(zenith_code_phase1,1023);
 
 % derive precise SP bin location
-[pixel_delay_chips,pixel_doppler_hz,pixel_add_range_to_sp_chips] = deldop(tx_pos_xyz,rx_pos_xyz, ...
+[~,pixel_doppler_hz,pixel_add_range_to_sp_chips] = deldop(tx_pos_xyz,rx_pos_xyz, ...
     tx_vel_xyz,rx_vel_xyz,sx_pos_xyz);
 
 delay_error = add_range_to_sp_chips-pixel_add_range_to_sp_chips;
@@ -46,12 +48,12 @@ pixel_doppler_hz = pixel_doppler_hz+doppler_clk;
 doppler_error = doppler_center_hz-pixel_doppler_hz;
 sp_dopp_col = doppler_center_bin-doppler_error/doppler_resolution;
 
-sp_delay_error = delay_center_chips-pixel_delay_chips;
-sp_dopp_error = doppler_center_hz-pixel_doppler_hz;
+sp_delay_error = delay_error; 
+sp_dopp_error = doppler_error;
 
 % derive confidence flag
 if dist_to_coast < 0
-    confidence_flag = 3;
+    confidence_flag = 3;            % confident on the ocean surface
 
 else
     peak_counts = max(raw_counts,[],'all');
@@ -71,9 +73,9 @@ else
     elseif snr_db<2 && ~delay_doppler_snell
         confidence_flag = 1;
     elseif snr_db<2 && delay_doppler_snell
-        confidence_flag = 3;
+        confidence_flag = 2;
     elseif snr_db>=2 && delay_doppler_snell
-        confidence_flag = 4;
+        confidence_flag = 3;
     else
         confidence_flag = nan;
     end

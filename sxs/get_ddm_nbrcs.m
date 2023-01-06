@@ -73,11 +73,11 @@ if (sx_delay_bin_float < 37) && (sx_delay_bin_float > 2) && ...
 
 else
 
-    nbrcs.nbrcs_scatter = -9999999;
-    nbrcs.nbrcs_value = -9999999;
+    nbrcs.nbrcs_scatter = nan;
+    nbrcs.nbrcs_value = nan;
 
-    LES.LES_scatter = -9999999;
-    LES.LES_slope = -9999999;
+    LES.LES_scatter = nan;
+    LES.LES_slope = nan;
 
 end
 
@@ -110,8 +110,8 @@ if (max_delay_bin < 37) && (max_doppler_bin < 5) && (max_doppler_bin > 1)
     TES.TES_slope = TES_slope;
 
 else
-    TES.TES_scatter = -9999999;
-    TES.TES_slope = -9999999;
+    TES.TES_scatter = nan;
+    TES.TES_slope = nan;
 
 end
 

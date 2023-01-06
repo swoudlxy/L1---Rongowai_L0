@@ -4,16 +4,14 @@
 % 1) tx, rx: tx and rx structures
 % 2) sx_pos_xyz: sx ECEF position vector
 % 3) SV_PRN_LUT,SV_eirp_LUT: look-up table between SV number and PRN
-% 4) nadir_pattern: nadir antenna pattern
 % Outputs:
 % 1) sp_angle_body: sp angle in body frame, az and theta
 % 2) sp_angle_enu: sp angle in ENU frame, az and theta
 % 3) theta_gps: GPS off boresight angle
 % 4) range: tx to sx range, and rx to sx range
 % 5) gps_rad: EIRP, tx power
-% 6) rx_rad: LHCP and RHCP antenna gain
 
-function [sp_angle_body,sp_angle_enu,sp_angle_ant,theta_gps,range,gps_rad,rx_rad] = spRelated(tx,rx,sx_pos_xyz,SV_eirp_LUT,nadir_pattern)
+function [sp_angle_body,sp_angle_enu,sp_angle_ant,theta_gps,range,gps_rad] = spRelated(tx,rx,sx_pos_xyz,SV_eirp_LUT)
 
 % sparse structres
 tx_pos_xyz = tx.tx_pos_xyz;
@@ -23,14 +21,6 @@ sv_num = tx.sv_num;
 rx_pos_xyz = rx.rx_pos_xyz;
 rx_vel_xyz = rx.rx_vel_xyz;
 rx_att = rx.rx_attitude;
-
-% define azimuth and elevation angle in the antenna frame
-res = 0.1;                                          % resolution in degrees
-az_deg = 0:res:360; 
-el_deg = 120:-1*res:0;
-
-lhcp_gain_pattern = nadir_pattern.LHCP;
-rhcp_gain_pattern = nadir_pattern.RHCP;
 
 % compute angles
 [theta_gps,~] = ecef2orf(tx_pos_xyz,tx_vel_xyz,sx_pos_xyz);
@@ -75,13 +65,7 @@ end
 
 sp_angle_ant = [sp_theta_ant,sp_az_ant];
 
-[~,az_index] = min(abs(sp_az_ant-az_deg));
-[~,el_index] = min(abs(sp_theta_ant-el_deg));
 
-lhcp_gain_dbi = lhcp_gain_pattern(az_index,el_index);
-rhcp_gain_dbi = rhcp_gain_pattern(az_index,el_index);
-
-rx_rad = [lhcp_gain_dbi,rhcp_gain_dbi];
 
 
 

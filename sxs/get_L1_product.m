@@ -1,20 +1,13 @@
-% This script operates the L1b calibration for Rongowai
-% Version: Matlab - 1.0
-% inital version verified by CYGNSS L1
-% Version: Matlab - 1.1
-% 1) update according to the Rongowai bench test data
-% 2) convert all external source files date files
-% 3) the value for all invalid fields is defined as -9999
-% 4) L1a changes to using power in watts to avoid error when converting a
-% negative power watts to dB
+% This function solves all L1 variables and packets as a structure for
+% processing multiple L0 files
 
-%% Prelaunch 1: Load L0 data
-clear
-clc
+function L1_postCal = get_L1_product(   L0_filename, ...
+                                        L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm, ...
+                                        dem,dtu10,landmask_nz,lcv_mask,water_mask, ...
+                                        SV_PRN_LUT,SV_eirp_LUT,LHCP_pattern,RHCP_pattern, ...
+                                        phy_ele_size)
 
-% load L0 netCDF
-path1 = '../dat/raw/Week1_Nov/';
-L0_filename = [path1 '20221103-173530_NZTG-NZAA.nc'];
+% Prelaunch 1: Load L0 data and filter invalid values
 
 % PVT GPS week and sec
 pvt_gps_week = double(ncread(L0_filename,'/science/GPS_week_of_SC_attitude'));
@@ -54,9 +47,6 @@ std_dev_rf1 = double(ncread(L0_filename,'/science/ddm/RF1_zenith_RHCP_std_dev'))
 std_dev_rf2 = double(ncread(L0_filename,'/science/ddm/RF2_nadir_LHCP_std_dev')); 
 std_dev_rf3 = double(ncread(L0_filename,'/science/ddm/RF3_nadir_RHCP_std_dev'));
 
-delay_bin_res = double(ncread(L0_filename,'/science/ddm/delay_bin_res_narrow'));        % delay bin resolution
-doppler_bin_res = double(ncread(L0_filename,'/science/ddm/doppler_bin_res_narrow'));    % doppler bin resolution
-
 % absolute ddm center delay and doppler
 delay_center_chips = double(ncread(L0_filename,'/science/ddm/center_delay_bin_code_phase'));    
 doppler_center_hz = double(ncread(L0_filename,'/science/ddm/center_doppler_bin_frequency'));
@@ -73,13 +63,10 @@ eng_timestamp = double(ncread(L0_filename,'/eng/packet_creation_time'));
 zenith_ant_temp_eng = double(ncread(L0_filename,'/eng/zenith_ant_temp'));
 nadir_ant_temp_eng = double(ncread(L0_filename,'/eng/nadir_ant_temp'));
 
-% Load L0 data ends
-
-%% Prelaunch 1.5: Filter valid timestampes
-clc
+% the below scrpits filter valid data
 
 % rx-related variables
-index1 = ~isnan(pvt_gps_week);
+index1 = pvt_gps_week>0;
 
 pvt_gps_week = pvt_gps_week(index1);        pvt_gps_sec = pvt_gps_sec(index1);
 
@@ -213,104 +200,16 @@ eng_timestamp = eng_timestamp(index3);
 nadir_ant_temp_eng = nadir_ant_temp_eng(index3);
 zenith_ant_temp_eng = zenith_ant_temp_eng(index3);
 
-%% Prelaunch 2 - define external data paths and filenames
-clc
-
-% define IGS orbits filename (*.sp3)
-% note this path is defined in C++ format
-gps_orbit_filename = '..//dat//orbits//igr22341.sp3';
-
-% load L1a calibration tables
-L1a_path = '../dat/L1a_cal/';
-
-L1a_cal_ddm_counts_db = readmatrix([L1a_path 'L1A_cal_ddm_counts_dB.dat']);
-L1a_cal_ddm_power_dbm = readmatrix([L1a_path 'L1A_cal_ddm_power_dBm.dat']);
-
-% load SRTM_30 DEM
-dem_path = '../dat/dem/';
-dem_file = 'nzsrtm_30_v1.tif';
-
-dem = get_dem([dem_path dem_file]);
-
-% load DTU10 model
-dtu_path = '../dat/dtu/';
-dtu_filename = 'dtu10_v1.dat';
-
-dtu10 = get_dtu10([dtu_path dtu_filename]);
-
-% load ocean/land (distance to coast) mask
-landmask_path = '../dat/cst/';
-landmask_filename = 'dist_to_coast_nz_v1.dat';
-
-landmask_nz = get_dist_to_coast_mask([landmask_path landmask_filename]);
-
-% process landcover mask
-lcv_path = '../dat/lcv/';
-lcv_filename = 'lcv.png';
-
-lcv_mask = imread([lcv_path lcv_filename]);
-
-% process inland water mask
-pek_path = '../dat/pek/';
-
-[pek_160E_40S,ref_160E_40S] = readgeoraster([pek_path 'occurrence_160E_40S.tif']);
-[pek_170E_30S,ref_170E_30S] = readgeoraster([pek_path 'occurrence_170E_30S.tif']);
-[pek_170E_40S,ref_170E_40S] = readgeoraster([pek_path 'occurrence_170E_40S.tif']);
-
-water_mask_160E_40S.pek = pek_160E_40S;
-water_mask_160E_40S.ref = ref_160E_40S;
-
-water_mask_170E_30S.pek = pek_170E_30S;
-water_mask_170E_30S.ref = ref_170E_30S;
-
-water_mask_170E_40S.pek = pek_170E_40S;
-water_mask_170E_40S.ref = ref_170E_40S;
-
-water_mask.water_mask_160E_40S = water_mask_160E_40S;
-water_mask.water_mask_170E_30S = water_mask_170E_30S;
-water_mask.water_mask_170E_40S = water_mask_170E_40S;
-
-% load PRN-SV and SV-EIRP(static) LUT
-gps_path = '../dat/gps/';
-SV_PRN_filename = 'PRN_SV_LUT_v1.dat';
-SV_eirp_filename = 'GPS_SV_EIRP_Params_v7.dat';
-
-SV_PRN_LUT = readmatrix([gps_path SV_PRN_filename]);
-SV_PRN_LUT = SV_PRN_LUT(:,1:2);
-
-SV_eirp_LUT = readmatrix([gps_path SV_eirp_filename]);
-
-% load and process nadir NGRx-GNSS antenna patterns
-rng_path = '../dat/rng/';
-
-LHCP_L_filename = 'GNSS_LHCP_L_gain_db_i_v1.dat';
-LHCP_R_filename = 'GNSS_LHCP_R_gain_db_i_v1.dat';
-
-RHCP_L_filename = 'GNSS_RHCP_L_gain_db_i_v1.dat';
-RHCP_R_filename = 'GNSS_RHCP_R_gain_db_i_v1.dat';
-
-[~,~,LHCP_L_gain_db_i] = get_ant_pattern([rng_path,LHCP_L_filename]);
-[~,~,LHCP_R_gain_db_i] = get_ant_pattern([rng_path,LHCP_R_filename]);
-LHCP_pattern.LHCP = LHCP_L_gain_db_i;
-LHCP_pattern.RHCP = LHCP_R_gain_db_i;
-
-[~,~,RHCP_L_gain_db_i] = get_ant_pattern([rng_path,RHCP_L_filename]);
-[~,~,RHCP_R_gain_db_i] = get_ant_pattern([rng_path,RHCP_R_filename]);
-RHCP_pattern.LHCP = RHCP_L_gain_db_i;
-RHCP_pattern.RHCP = RHCP_R_gain_db_i;
-
-% load physical scattering area LUT
-phy_ele_size = readmatrix('../dat/dem/phy_ele_size.dat');
-
-%% Part 1: General processing
-% This part derives global constants, timestamps, and all the other
-% parameters at ddm timestamps
-clc
-
 invalid = nan;                              % defines the value to be used for invalid fields
-
 I = length(pvt_gps_sec);                    % total length of samples
 J = 20;                                     % maximal NGRx capacity
+
+% initialise a structure to save L1 results
+L1_postCal = struct;
+
+% Part 1: General processing
+% This part derives global constants, timestamps, and all the other
+% parameters at ddm timestamps
 
 % initialise output data array for Part 1 processing
 pvt_utc = zeros(I,1)+invalid;       ddm_utc = zeros(I,1)+invalid;
@@ -318,9 +217,6 @@ gps_week = zeros(I,1)+invalid;      gps_tow = zeros(I,1)+invalid;
 ddm_pvt_bias = zeros(I,1)+invalid;
 add_range_to_sp = zeros(J,I)+invalid;
 status_flags_one_hz = zeros(I,1)+invalid;
-
-% initialise a structure to save L1 results
-L1_postCal = struct;
 
 % derive and save ddm_timestamp_utc/gps to L1 structure
 for i = 1:I
@@ -368,7 +264,6 @@ rx_attitude = [rx_roll rx_pitch rx_yaw];
 
 rx_clk_bias_m = interp1(pvt_utc,rx_clk_bias_m_pvt,ddm_utc,'linear','extrap');
 rx_clk_drift_mps = interp1(pvt_utc,rx_clk_drift_mps_pvt,ddm_utc,'linear','extrap');
-rx_clk = [rx_clk_bias_m rx_clk_drift_mps];
 
 for j = 1:J
     
@@ -497,10 +392,17 @@ L1_postCal.status_flags_one_hz = status_flags_one_hz;
 
 % Part 1 ends
 
-%% Part 2: Derive TX related variables
+% Part 2: Derive TX related variables
 % This part derives TX positions and velocities, maps between PRN and SVN,
 % and gets track ID
-clc
+
+% define IGS orbits filename (*.sp3) to be used to solve TX positions
+% note this path is defined in C++ format
+gps_orbit_name1 = num2str(gps_week(1));
+gps_orbit_name2 = num2str(floor(gps_tow(end)/86400));
+sp3_filename = [gps_orbit_name1 gps_orbit_name2 '.sp3'];
+
+gps_orbit_filename = ['..//dat//orbits//igr' sp3_filename];
 
 trans_id_unique = unique(transmitter_id);
 trans_id_unique = trans_id_unique(trans_id_unique>0);
@@ -540,8 +442,7 @@ for i = 1:I
 
             tx_clk_bias(j,i) = tx_clk_bias1;
 
-            prn_code(j,i) = prn1;           
-            sv_num(j,i) = sv_num1;
+            prn_code(j,i) = prn1;           sv_num(j,i) = sv_num1;
             track_id(j,i) = find(trans_id_unique == transmitter_id1);
 
         end
@@ -574,10 +475,9 @@ L1_postCal.prn_code = prn_code;
 L1_postCal.sv_num = sv_num;
 L1_postCal.track_id = track_id;
 
-%% Part 3: L1a calibration
+% Part 3: L1a calibration
 % this part converts from raw counts to signal power in watts and complete
 % L1a calibration
-clc
 
 offset = 4;                         % offset delay rows to derive noise floor
 
@@ -632,7 +532,7 @@ for i = 1:I
 
             % peak ddm location
             peak_ddm_counts1 = max(max(ddm_power_counts1));
-            [~,peak_delay_bin1] = find(ddm_power_counts1==peak_ddm_counts1);
+            [~,peak_delay_bin1] = find(ddm_power_counts1==peak_ddm_counts1,1);
 
             peak_ddm_watts1 = max(max(ddm_power_watts1));
             
@@ -738,8 +638,7 @@ L1_postCal.ddm_ant = ddm_ant;
 
 % Part 3 ends
 
-%% Part 4A: SP solver and geometries
-clc
+% Part 4A: SP solver and geometries
 
 % initialise variables
 sx_pos_x = zeros(J,I)+invalid;
@@ -796,10 +695,10 @@ for i = 1:I
         tx1.tx_pos_xyz = tx_pos_xyz1;
         tx1.tx_vel_xyz = tx_vel_xyz1;
 
-        trans_id1 = prn_code(j,i);
+        %trans_id1 = prn_code(j,i);
         sv_num1 = sv_num(j,i);          tx1.sv_num = sv_num1;
 
-        ddm_ant1 = ddm_ant(j,i);
+        %ddm_ant1 = ddm_ant(j,i);
 
         % only process these with valid TX positions
         if ~isnan(tx_pos_x(j,i))
@@ -851,10 +750,6 @@ for i = 1:I
                 % in various frames, ranges and antenna gain/GPS EIRP
                 [sx_angle_body1,sx_angle_enu1,sx_angle_ant1,theta_gps1,ranges1,gps_rad1] = spRelated(tx1,rx1, ...
                     sx_pos_xyz1,SV_eirp_LUT);
-
-                % get values for deriving BRCS and reflectivity
-                R_tsx1 = ranges1(1);        R_rsx1 = ranges1(2);
-                gps_eirp_watt1 = gps_rad1(3);
 
                 % get active antenna gain for LHCP and RHCP channels
                 sx_rx_gain_LHCP1 = get_sx_rx_gain(sx_angle_ant1,LHCP_pattern);
@@ -957,8 +852,8 @@ L1_postCal.static_gps_eirp = static_gps_eirp;
 L1_postCal.gps_tx_power_db_w = gps_tx_power_db_w;
 L1_postCal.gps_ant_gain_db_i = gps_ant_gain_db_i;
 
-%% Part 4B: BRCS/NBRCS, reflectivity, coherent status and fresnel zone
-clc
+% Part 4B: BRCS/NBRCS, reflectivity, coherent status and fresnel zone
+%clc
 
 % initialise variables
 brcs_ddm_peak_bin_delay_row = zeros(J,I)+invalid;
@@ -1026,7 +921,7 @@ for i = 1:I
         sx_pos_xyz1 = [sx_pos_x(j,i) sx_pos_y(j,i) sx_pos_z(j,i)];
         sx_pos_lla1 = ecef2lla(sx_pos_xyz1);
 
-        sx_inc_angle1 = sx_inc_angle(j,i);
+        %sx_inc_angle1 = sx_inc_angle(j,i);
         sx_d_snell_deg1 = sx_d_snell_angle(j,i);
         dist_to_coast1 = dist_to_coast_km(j,i);
         
@@ -1124,8 +1019,6 @@ L1_postCal.confidence_flag = confidence_flag;
 
 L1_postCal.eff_scatter = A_eff;
 L1_postCal.A_eff_all = A_eff_all;
-%%
-clc
 
 % derive brcs, nbrcs, and other parameters
 for i = 1:I
@@ -1147,13 +1040,10 @@ for i = 1:I
         ddm_ant1 = ddm_ant(j,i);
         
         % retrieve ddm-related variables
-        raw_counts1 = ddm_power_counts(:,:,j,i);          %ddm1.raw_counts = raw_counts1;        
-        %add_range_to_sp1 = add_range_to_sp(j,i);    %ddm1.add_range_to_sp = add_range_to_sp1;
-        snr_db1 = snr_db(j,i);                      %ddm1.snr_db = snr_db1;
-
-        power_analog1 = power_analog(:,:,j,i);  % L1a calibrated power watts
+        raw_counts1 = ddm_power_counts(:,:,j,i); 
+        power_analog1 = power_analog(:,:,j,i);
+        snr_db1 = snr_db(j,i);       
         
-        %if ~isnan(tx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
         if ~isnan(ddm_ant1) && (sum(raw_counts1,'all')~=0)
 
             % compensate cable loss
@@ -1168,7 +1058,7 @@ for i = 1:I
             cable_loss = db2pow(cable_loss_db);
             power_analog_cable_loss1 = power_analog1*cable_loss;
             
-            % Part 4.4b: brcs, nbrcs, LES and TES
+            % Part 4.4b: brcs, nbrcs
             brcs1 = ddm_brcs(power_analog_cable_loss1,eirp_watt1,rx_gain_db_i1,TSx1,RSx1);
 
             A_eff1 = A_eff(:,:,j,i);
@@ -1257,9 +1147,7 @@ L1_postCal.coherency_state = coherency_state;
 
 L1_postCal.norm_refl_waveform = norm_refl_waveform;
 
-%% Cross Pol
-clc
-
+% Cross Pol
 nbrcs_cross_pol_v1 = zeros(J,I)+invalid;
 nbrcs_cross_pol_v2 = zeros(J,I)+invalid;
 
@@ -1291,15 +1179,13 @@ L1_postCal.nbrcs_cross_pol_v1 = nbrcs_cross_pol_v1;
 L1_postCal.nbrcs_cross_pol_v2 = nbrcs_cross_pol_v2;
 L1_postCal.lna_noise_figure = zeros(J,I)+3;         % LNA noise figure is 3 dB according to the specification
 
-%% Quality Flags
-clc
-
+% Quality Flags
 quality_flags1 = zeros(J,I)+invalid;
 
 for i = 1:I
     for j = 1:J
 
-        quality_flag1_1 = zeros(1,23);
+        quality_flag1_1 = zeros(1,24);
 
         % flag 2, 3 and 23
         rx_roll1 = rx_roll(i);
@@ -1394,7 +1280,7 @@ for i = 1:I
                 (floor(sp_dopp_col) < 5) && (floor(sp_dopp_col) > 1)
             brcs_ddma = brcs(floor(sp_dopp_col)-1:floor(sp_dopp_col)+1, ...
                             floor(sp_delay_row):floor(sp_dopp_col)+3);
-            det = find(brcs_ddma<0);
+            det = find(brcs_ddma<0, 1);
             if ~isempty(det)
                 quality_flag1_1(17) = 1;
             end
@@ -1427,6 +1313,13 @@ for i = 1:I
             quality_flag1_1(22) = 1;
         end
 
+        % flag 24
+        prn1 = prn_code(j,i);
+        if prn1 == 28
+            quality_flag1_1(24) = 1;
+        end
+
+
         % flag 1
         if (quality_flag1_1(3) == 1 || ...
             quality_flag1_1(4) == 1 || ...
@@ -1443,9 +1336,9 @@ for i = 1:I
             quality_flag1_1(17) == 1 || ...
             quality_flag1_1(18) == 1 || ...
             quality_flag1_1(20) == 1 || ...
-            quality_flag1_1(23) == 1 || ...
             quality_flag1_1(22) == 1 || ...
-            quality_flag1_1(23) == 1)
+            quality_flag1_1(23) == 1 || ...
+            quality_flag1_1(24) == 1)
         
             quality_flag1_1(1) = 1;
 
@@ -1457,17 +1350,3 @@ for i = 1:I
 end
 
 L1_postCal.quality_flags1 = quality_flags1;
-
-%save('../out/L1_postCal_ver2.mat','L1_postCal')
-
-%% packet to netCDF
-%clc
-
-%netCDF_name = '../out/sample1.nc';
-%L1_dict = '../dat/L1_dict_final.xlsx';
-
-%L1_info = get_netcdf(netCDF_name,L1_dict,L1_postCal);
-
-% L1 calibration ends
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

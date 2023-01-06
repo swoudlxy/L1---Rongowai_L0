@@ -3,16 +3,17 @@
 % Fresnel dimension is computed only the DDM is classified as coherent
 % reflection.
 
-function [fresnel_coeff,fresnel_axis,fresnel_orientation] = get_fresnel(tx,rx,sx,inc_angle,ddm_ant)
+function [fresnel_coeff,fresnel_axis,fresnel_orientation] = get_fresnel(tx_pos_xyz,...
+    rx_pos_xyz,sx_pos_xyz,dist_to_coast,inc_angle,ddm_ant)
 
 wgs84 = wgs84Ellipsoid('meter');
 eps_ocean = 74.62+1j*51.92;         % complex permittivity of ocean
 
 % sparse structures
-tx_pos_xyz = tx.tx_pos_xyz;
-rx_pos_xyz = rx.rx_pos_xyz;
-sx_pos_xyz = sx.sx_pos_xyz;
-dist_to_coast = sx.dist_to_coast;
+%tx_pos_xyz = tx.tx_pos_xyz;
+%rx_pos_xyz = rx.rx_pos_xyz;
+%sx_pos_xyz = sx.sx_pos_xyz;
+%dist_to_coast = sx.dist_to_coast;
 
 % define constants
 fc = 1575.42e6;             % operating frequency
@@ -73,7 +74,7 @@ if dist_to_coast <= 0
     end
 
 else
-    fresnel_coeff = -99999999;
+    fresnel_coeff = nan;
 
 end
 

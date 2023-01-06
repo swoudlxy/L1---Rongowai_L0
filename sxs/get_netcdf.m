@@ -4,6 +4,8 @@ L1_dict = readtable(L1_dict_name);
 L1_dict = string(table2cell(L1_dict));
 
 field_names = fieldnames(L1_postCal);
+field_names(119) = [];                  % debug only
+
 L = length(field_names);
 
 ncid = netcdf.create(L1_netCDF_name,'NETCDF4');
@@ -22,6 +24,7 @@ for l = 1:L
         att_value = getfield(L1_postCal,field_name1);
         netcdf.putAtt(ncid,netcdf.getConstant('NC_GLOBAL'),netCDF_field_name,string(att_value));
     end
+    
 
 end
 
@@ -41,7 +44,6 @@ for l = 1:30
     index1 = strcmp(L1_dict(:,1),field_name1);
     netCDF_field_name = L1_dict(index1,1);
     long_name = L1_dict(index1,2);
-    %data_type = L1_dict(index1,3);
     unit = L1_dict(index1,4);
     dimension = L1_dict(index1,5);
     comment = L1_dict(index1,6);
@@ -129,7 +131,7 @@ comment = L1_dict(index1,6);
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'units',unit);
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
     end
-
+    
 end
 
 sample_info = ncinfo(L1_netCDF_name);
