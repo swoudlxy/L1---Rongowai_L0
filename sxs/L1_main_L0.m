@@ -14,7 +14,7 @@ clc
 
 % load L0 netCDF
 path1 = '../dat/raw/Week1_Nov/';
-L0_filename = [path1 '20221103-173530_NZTG-NZAA.nc'];
+L0_filename = [path1 '20221103-121416_NZNV-NZCH.nc'];
 
 % PVT GPS week and sec
 pvt_gps_week = double(ncread(L0_filename,'/science/GPS_week_of_SC_attitude'));
@@ -215,10 +215,6 @@ zenith_ant_temp_eng = zenith_ant_temp_eng(index3);
 
 %% Prelaunch 2 - define external data paths and filenames
 clc
-
-% define IGS orbits filename (*.sp3)
-% note this path is defined in C++ format
-gps_orbit_filename = '..//dat//orbits//igr22341.sp3';
 
 % load L1a calibration tables
 L1a_path = '../dat/L1a_cal/';
@@ -501,6 +497,14 @@ L1_postCal.status_flags_one_hz = status_flags_one_hz;
 % This part derives TX positions and velocities, maps between PRN and SVN,
 % and gets track ID
 clc
+
+% define IGS orbits filename (*.sp3) to be used to solve TX positions
+% note this path is defined in C++ format
+gps_orbit_name1 = num2str(gps_week(1));
+gps_orbit_name2 = num2str(floor(gps_tow(end)/86400));
+sp3_filename = [gps_orbit_name1 gps_orbit_name2 '.sp3'];
+
+gps_orbit_filename = ['..//dat//orbits//igr' sp3_filename];
 
 trans_id_unique = unique(transmitter_id);
 trans_id_unique = trans_id_unique(trans_id_unique>0);
@@ -809,44 +813,44 @@ for i = 1:I
             % to coast
             [sx_pos_xyz1,inc_angle_deg1,d_snell_deg1,dist_to_coast_km1,LOS_flag1] = sp_solver(tx_pos_xyz1,rx_pos_xyz1, ...
                 dem,dtu10,landmask_nz);
-            
-            sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
-            surface_type1 = get_surf_type(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);
 
-            % derive sx velocity
-            dt = 1;                                         % time step in second
-            tx_pos_xyz_dt = tx_pos_xyz1+dt*tx_vel_xyz1;
-            rx_pos_xyz_dt = rx_pos_xyz1+dt*rx_vel_xyz1;
-            [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem,dtu10,landmask_nz);
-
-            sx_vel_xyz1 = sx_pos_xyz_dt-sx_pos_xyz1;            
-
-            % save sx values to variables
-            sx_pos_x(j,i) = sx_pos_xyz1(1);
-            sx_pos_y(j,i) = sx_pos_xyz1(2);
-            sx_pos_z(j,i) = sx_pos_xyz1(3);
-
-            sx_lat(j,i) = sx_pos_lla1(1);
-            sx_lon(j,i) = sx_pos_lla1(2);
-            sx_alt(j,i) = sx_pos_lla1(3);
-
-            sx_vel_x(j,i) = sx_vel_xyz1(1);
-            sx_vel_y(j,i) = sx_vel_xyz1(2);
-            sx_vel_z(j,i) = sx_vel_xyz1(3);
-            surface_type(j,i) = surface_type1;
-
-            sx_inc_angle(j,i) = inc_angle_deg1;
-            sx_d_snell_angle(j,i) = d_snell_deg1;
-            dist_to_coast_km(j,i) = dist_to_coast_km1;
-
-            LOS_flag(j,i) = LOS_flag1;
-
-            % Part 4.2: SP-related variables - 1
-            % this part derives tx/rx gains, ranges and other related
-            % variables
-            % only process samples with valid sx positions, i.e., LOS = 1
             if LOS_flag1 == 1
-                
+                sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
+                surface_type1 = get_surf_type(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);
+
+                % only process samples with valid sx positions, i.e., LOS = 1
+                % derive sx velocity
+                dt = 1;                                         % time step in second
+                tx_pos_xyz_dt = tx_pos_xyz1+dt*tx_vel_xyz1;
+                rx_pos_xyz_dt = rx_pos_xyz1+dt*rx_vel_xyz1;
+                [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem,dtu10,landmask_nz);
+
+                sx_vel_xyz1 = sx_pos_xyz_dt-sx_pos_xyz1;            
+
+                % save sx values to variables
+                sx_pos_x(j,i) = sx_pos_xyz1(1);
+                sx_pos_y(j,i) = sx_pos_xyz1(2);
+                sx_pos_z(j,i) = sx_pos_xyz1(3);
+
+                sx_lat(j,i) = sx_pos_lla1(1);
+                sx_lon(j,i) = sx_pos_lla1(2);
+                sx_alt(j,i) = sx_pos_lla1(3);
+
+                sx_vel_x(j,i) = sx_vel_xyz1(1);
+                sx_vel_y(j,i) = sx_vel_xyz1(2);
+                sx_vel_z(j,i) = sx_vel_xyz1(3);
+                surface_type(j,i) = surface_type1;
+
+                sx_inc_angle(j,i) = inc_angle_deg1;
+                sx_d_snell_angle(j,i) = d_snell_deg1;
+                dist_to_coast_km(j,i) = dist_to_coast_km1;
+
+                LOS_flag(j,i) = LOS_flag1;
+
+                % Part 4.2: SP-related variables - 1
+                % this part derives tx/rx gains, ranges and other related
+                % variables
+                                
                 % derive SP related geo-parameters, including angles
                 % in various frames, ranges and antenna gain/GPS EIRP
                 [sx_angle_body1,sx_angle_enu1,sx_angle_ant1,theta_gps1,ranges1,gps_rad1] = spRelated(tx1,rx1, ...
@@ -1051,7 +1055,7 @@ for i = 1:I
         ddm1.delay_resolution = 0.25;   ddm1.num_delay_bins = 40;   ddm1.delay_center_bin = 20;
         ddm1.doppler_resolution = 500;  ddm1.num_doppler_bins = 5;  ddm1.doppler_center_bin = 2;
 
-        if ~isnan(tx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
+        if ~isnan(sx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
             
             % Part 4.3: SP-related variables - 2
             % this part derives confidence and floating bin locations of SP
@@ -1124,8 +1128,6 @@ L1_postCal.confidence_flag = confidence_flag;
 
 L1_postCal.eff_scatter = A_eff;
 L1_postCal.A_eff_all = A_eff_all;
-%%
-clc
 
 % derive brcs, nbrcs, and other parameters
 for i = 1:I
@@ -1154,7 +1156,7 @@ for i = 1:I
         power_analog1 = power_analog(:,:,j,i);  % L1a calibrated power watts
         
         %if ~isnan(tx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
-        if ~isnan(ddm_ant1) && (sum(raw_counts1,'all')~=0)
+        if ~isnan(ddm_ant1) && ~isnan(sx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
 
             % compensate cable loss
             if ddm_ant1 == 2

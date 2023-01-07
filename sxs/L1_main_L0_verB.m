@@ -96,7 +96,7 @@ phy_ele_size = readmatrix('../dat/dem/phy_ele_size.dat');
 %% get post-calibrated L1 product
 clc
 
-for l = 24:L
+for l = 38:L
 
     filename = L0_filenames(l).name;
     path = L0_filenames(l).folder;

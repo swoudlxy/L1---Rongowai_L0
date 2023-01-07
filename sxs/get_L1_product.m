@@ -708,43 +708,44 @@ for i = 1:I
             % to coast
             [sx_pos_xyz1,inc_angle_deg1,d_snell_deg1,dist_to_coast_km1,LOS_flag1] = sp_solver(tx_pos_xyz1,rx_pos_xyz1, ...
                 dem,dtu10,landmask_nz);
-            
-            sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
-            surface_type1 = get_surf_type(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);
-
-            % derive sx velocity
-            dt = 1;                                         % time step in second
-            tx_pos_xyz_dt = tx_pos_xyz1+dt*tx_vel_xyz1;
-            rx_pos_xyz_dt = rx_pos_xyz1+dt*rx_vel_xyz1;
-            [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem,dtu10,landmask_nz);
-
-            sx_vel_xyz1 = sx_pos_xyz_dt-sx_pos_xyz1;            
-
-            % save sx values to variables
-            sx_pos_x(j,i) = sx_pos_xyz1(1);
-            sx_pos_y(j,i) = sx_pos_xyz1(2);
-            sx_pos_z(j,i) = sx_pos_xyz1(3);
-
-            sx_lat(j,i) = sx_pos_lla1(1);
-            sx_lon(j,i) = sx_pos_lla1(2);
-            sx_alt(j,i) = sx_pos_lla1(3);
-
-            sx_vel_x(j,i) = sx_vel_xyz1(1);
-            sx_vel_y(j,i) = sx_vel_xyz1(2);
-            sx_vel_z(j,i) = sx_vel_xyz1(3);
-            surface_type(j,i) = surface_type1;
-
-            sx_inc_angle(j,i) = inc_angle_deg1;
-            sx_d_snell_angle(j,i) = d_snell_deg1;
-            dist_to_coast_km(j,i) = dist_to_coast_km1;
 
             LOS_flag(j,i) = LOS_flag1;
 
-            % Part 4.2: SP-related variables - 1
-            % this part derives tx/rx gains, ranges and other related
-            % variables
             % only process samples with valid sx positions, i.e., LOS = 1
             if LOS_flag1 == 1
+
+                sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
+                surface_type1 = get_surf_type(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);
+
+                % derive sx velocity
+                dt = 1;                                         % time step in second
+                tx_pos_xyz_dt = tx_pos_xyz1+dt*tx_vel_xyz1;
+                rx_pos_xyz_dt = rx_pos_xyz1+dt*rx_vel_xyz1;
+                [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem,dtu10,landmask_nz);
+
+                sx_vel_xyz1 = sx_pos_xyz_dt-sx_pos_xyz1;            
+
+                % save sx values to variables
+                sx_pos_x(j,i) = sx_pos_xyz1(1);
+                sx_pos_y(j,i) = sx_pos_xyz1(2);
+                sx_pos_z(j,i) = sx_pos_xyz1(3);
+
+                sx_lat(j,i) = sx_pos_lla1(1);
+                sx_lon(j,i) = sx_pos_lla1(2);
+                sx_alt(j,i) = sx_pos_lla1(3);
+
+                sx_vel_x(j,i) = sx_vel_xyz1(1);
+                sx_vel_y(j,i) = sx_vel_xyz1(2);
+                sx_vel_z(j,i) = sx_vel_xyz1(3);
+                surface_type(j,i) = surface_type1;
+
+                sx_inc_angle(j,i) = inc_angle_deg1;
+                sx_d_snell_angle(j,i) = d_snell_deg1;
+                dist_to_coast_km(j,i) = dist_to_coast_km1;            
+
+                % Part 4.2: SP-related variables - 1
+                % this part derives tx/rx gains, ranges and other related
+                % variables
                 
                 % derive SP related geo-parameters, including angles
                 % in various frames, ranges and antenna gain/GPS EIRP
@@ -946,7 +947,7 @@ for i = 1:I
         ddm1.delay_resolution = 0.25;   ddm1.num_delay_bins = 40;   ddm1.delay_center_bin = 20;
         ddm1.doppler_resolution = 500;  ddm1.num_doppler_bins = 5;  ddm1.doppler_center_bin = 2;
 
-        if ~isnan(tx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
+        if ~isnan(sx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
             
             % Part 4.3: SP-related variables - 2
             % this part derives confidence and floating bin locations of SP
@@ -1044,7 +1045,7 @@ for i = 1:I
         power_analog1 = power_analog(:,:,j,i);
         snr_db1 = snr_db(j,i);       
         
-        if ~isnan(ddm_ant1) && (sum(raw_counts1,'all')~=0)
+        if ~isnan(ddm_ant1) && ~isnan(sx_pos_x(j,i)) && (sum(raw_counts1,'all')~=0)
 
             % compensate cable loss
             if ddm_ant1 == 2
