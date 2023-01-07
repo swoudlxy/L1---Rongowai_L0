@@ -1258,7 +1258,7 @@ for i = 1:I
 
         % flag 12
         zenith_code_phase1 = zenith_code_phase(j,i);
-        signal_code_phase1 = delay_correction(meter2chips(add_range_to_sp(j,i)));
+        signal_code_phase1 = delay_correction(meter2chips(add_range_to_sp(j,i)),1023);
         diff1 = zenith_code_phase1-signal_code_phase1;
         if diff1 >= 10
             quality_flag1_1(12) = 1;
