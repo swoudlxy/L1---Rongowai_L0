@@ -446,7 +446,7 @@ for i = 1:I
             if flag == 0
 
                 sp3_filename = ['IGS0OPSRAP_' num2str(year1) num2str(doy1) '0000_01D_15M_ORB.sp3'];
-                gps_orbit_filename = ['..//dat//orbits// ' sp3_filename];                
+                gps_orbit_filename = ['..//dat//orbits//' sp3_filename];                
 
             elseif flag == 1
                 if i<change_idx
@@ -525,15 +525,15 @@ for i = 1:I
             if flag == 0
 
                 sp3_filename = ['igr' num2str(gps_week1) num2str(gps_dow1) '.sp3'];
-                gps_orbit_filename = ['..//dat//orbits// ' sp3_filename];                
+                gps_orbit_filename = ['..//dat//orbits//' sp3_filename];                
 
             elseif flag == 1
                 if i<change_idx
-                    sp3_filename = [igr' num2str(gps_week1) num2str(gps_dow1) '.sp3'];
+                    sp3_filename = ['igr' num2str(gps_week1) num2str(gps_dow1) '.sp3'];
                     gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
 
                 elseif i>=change_idx
-                    sp3_filename = [igr' num2str(gps_week2) num2str(gps_dow2) '.sp3'];
+                    sp3_filename = ['igr' num2str(gps_week2) num2str(gps_dow2) '.sp3'];
                     gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
                 
                 end
