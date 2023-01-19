@@ -36,7 +36,6 @@ if LOS_flag == 1
     % step 2 - project to local DEM for land SPs
     if dist > 0
 
-        %local_dem = get_local_dem(sx_pos_lla,90,30,dem_data,dtu10,dist);
         local_height = local_dem.ele;
         local_height = local_height(2,2);       % local height of the SP
 
@@ -47,7 +46,12 @@ if LOS_flag == 1
 
     end
 
-    inc_angle_deg = theta_i;
+    %inc_angle_deg = theta_i;
+    
+    v_tsx = tx_pos_xyz-sx_pos_xyz;
+    unit_tsx = v_tsx/norm(v_tsx); 
+    unit_sx = sx_pos_xyz/norm(sx_pos_xyz);
+    inc_angle_deg = acosd(dot(unit_tsx,unit_sx));
 
     d_theta = theta_i-theta_s;
     d_phi1 = sind(phi_s-(phi_i+180))/cosd(phi_s-(phi_i+180));

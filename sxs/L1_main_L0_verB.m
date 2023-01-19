@@ -1,9 +1,9 @@
-% version B of L1 code to process mulitple L0 files
+% version B of L1 code to process mulitple L0 files at a time
 clear
 clc
 
 % load L0 data
-L0_path = '../dat/raw/Week1_Nov/';
+L0_path = '../dat/raw/Week3_Nov/';
 L0_filenames = dir([L0_path '*.nc']);
 
 L = length(L0_filenames);
@@ -93,10 +93,13 @@ RHCP_pattern.RHCP = RHCP_R_gain_db_i;
 % physical element size LUT
 phy_ele_size = readmatrix('../dat/dem/phy_ele_size.dat');
 
+% L1 dictionary name
+L1_dict_name = '../dat/L1_Dict/L1_Dict_v2.xlsx';
+
 %% get post-calibrated L1 product
 clc
 
-for l = [19,22]
+for l = 1:L
 
     filename = L0_filenames(l).name;
     path = L0_filenames(l).folder;
@@ -110,16 +113,13 @@ for l = [19,22]
                                 LHCP_pattern,RHCP_pattern, ...
                                 phy_ele_size);
 
+    % the below saves solved L1 products as a MATLAB structure, not necessary for daily processing  
     save(['../out/L1_postCalData/' filename(1:end-3) '_L1.mat'],'L1_postCal','-v7.3');
 
+    % the below packets the L1 products as a netCDF
+    L1_netCDF = [filename '_L1.nc'];    % L1 in the filename to distinguish from L0 products
+    sample_info = get_netcdf(L1_netCDF,L1_dict_name,L1_postCal);
+
+    disp(l);    % display the number of files being processed
+
 end
-
-
-
-
-
-
-
-
-
-

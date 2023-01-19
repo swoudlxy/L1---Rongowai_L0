@@ -6,7 +6,7 @@ clear
 clc
 
 % define file and retrieve netCDF variables, attributes and comments
-filename = '../out/L1_sample1.nc';
+filename = '../out/L1_netCDFs/20221101-064735_NZAA-NZTG_L1.nc';
 L1_sample = ncinfo(filename);
 
 % retrieve variables and save to workspace

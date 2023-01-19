@@ -396,16 +396,25 @@ L1_postCal.status_flags_one_hz = status_flags_one_hz;
 % This part derives TX positions and velocities, maps between PRN and SVN,
 % and gets track ID
 
-% define IGS orbits filename (*.sp3) to be used to solve TX positions
-% note this path is defined in C++ format
-gps_orbit_name1 = num2str(gps_week(1));
-gps_orbit_name2 = num2str(floor(gps_tow(end)/86400));
-sp3_filename = [gps_orbit_name1 gps_orbit_name2 '.sp3'];
-
-gps_orbit_filename = ['..//dat//orbits//igr' sp3_filename];
-
 trans_id_unique = unique(transmitter_id);
 trans_id_unique = trans_id_unique(trans_id_unique>0);
+
+% new SP3 naming policy
+D_ddm1 = datetime(ddm_utc(1),'ConvertFrom','posixtime');
+[year1,~,~] = ymd(D_ddm1);
+doy1 = day(D_ddm1,'dayofyear');
+
+D_ddm2 = datetime(ddm_utc(end),'ConvertFrom','posixtime');
+[year2,~,~] = ymd(D_ddm1);
+doy2 = day(D_ddm2,'dayofyear');
+
+if doy1 == doy2
+    flag = 0;
+else
+    flag = 1;
+    dow = floor(gps_tow/86400);         % day of week
+    change_idx = find(ischange(dow)==1);
+end
 
 % initalise variables 
 tx_pos_x = zeros(J,I)+invalid;      tx_vel_x = zeros(J,I)+invalid;
@@ -433,6 +442,104 @@ for i = 1:I
 
             sv_num1 = SV_PRN_LUT(SV_PRN_LUT(:,1)==prn1,2);  % assign SVN
 
+            % assign correct sp3 files if the flight cross two dates
+            if flag == 0
+
+                sp3_filename = ['IGS0OPSRAP_' num2str(year1) num2str(doy1) '0000_01D_15M_ORB.sp3'];
+                gps_orbit_filename = ['..//dat//orbits// ' sp3_filename];                
+
+            elseif flag == 1
+                if i<change_idx
+                    sp3_filename = ['IGS0OPSRAP_' num2str(year1) num2str(doy1) '0000_01D_15M_ORB.sp3'];
+                    gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
+
+                elseif i>=change_idx
+                    sp3_filename = ['IGS0OPSRAP_' num2str(year2) num2str(doy2) '0000_01D_15M_ORB.sp3'];
+                    gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
+                
+                end
+
+            end
+
+            [tx_pos_xyz1,tx_vel_xyz1,tx_clk_bias1,~] = gps_posvel(prn1,ddm_gps_timestamp1, ...
+                gps_orbit_filename);
+
+            tx_pos_x(j,i) = tx_pos_xyz1(1); tx_vel_x(j,i) = tx_vel_xyz1(1);
+            tx_pos_y(j,i) = tx_pos_xyz1(2); tx_vel_y(j,i) = tx_vel_xyz1(2);
+            tx_pos_z(j,i) = tx_pos_xyz1(3); tx_vel_z(j,i) = tx_vel_xyz1(3);
+
+            tx_clk_bias(j,i) = tx_clk_bias1;           
+
+            prn_code(j,i) = prn1;           
+            sv_num(j,i) = sv_num1;
+            track_id(j,i) = find(trans_id_unique == transmitter_id1);
+
+        end
+
+    end
+end
+
+%{
+% old sp3 naming policy
+gps_week1 = num2str(gps_week(1));
+gps_dow1 = num2str(floor(gps_tow(1)/86400));
+
+gps_week2 = num2str(gps_week(end));
+gps_dow2 = num2str(floor(gps_tow(end)/86400));
+
+if dow1 == dow2
+    flag = 0;
+else
+    flag = 1;
+    dow = floor(gps_tow/86400);         % day of week
+    change_idx = find(ischange(dow)==1);
+end
+
+% initalise variables 
+tx_pos_x = zeros(J,I)+invalid;      tx_vel_x = zeros(J,I)+invalid;
+tx_pos_y = zeros(J,I)+invalid;      tx_vel_y = zeros(J,I)+invalid;
+tx_pos_z = zeros(J,I)+invalid;      tx_vel_z = zeros(J,I)+invalid;
+
+tx_clk_bias = zeros(J,I)+invalid;
+
+prn_code = zeros(J,I)+invalid;      sv_num = zeros(J,I)+invalid;
+track_id = zeros(J,I)+invalid;
+
+for i = 1:I
+
+    % gps timestamp
+    ddm_gps_timestamp1.gps_week = gps_week(i); 
+    ddm_gps_timestamp1.gps_tow = gps_tow(i);
+
+    for j = 1:J/2
+
+        % assign PRN
+        transmitter_id1 = transmitter_id(j,i);
+        prn1 = transmitter_id1;    
+
+        if prn1 ~= 0
+
+            sv_num1 = SV_PRN_LUT(SV_PRN_LUT(:,1)==prn1,2);  % assign SVN
+
+            % assign correct sp3 files if the flight cross two dates
+            if flag == 0
+
+                sp3_filename = ['igr' num2str(gps_week1) num2str(gps_dow1) '.sp3'];
+                gps_orbit_filename = ['..//dat//orbits// ' sp3_filename];                
+
+            elseif flag == 1
+                if i<change_idx
+                    sp3_filename = [igr' num2str(gps_week1) num2str(gps_dow1) '.sp3'];
+                    gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
+
+                elseif i>=change_idx
+                    sp3_filename = [igr' num2str(gps_week2) num2str(gps_dow2) '.sp3'];
+                    gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
+                
+                end
+
+            end
+
             [tx_pos_xyz1,tx_vel_xyz1,tx_clk_bias1,~] = gps_posvel(prn1,ddm_gps_timestamp1, ...
                 gps_orbit_filename);
 
@@ -441,15 +548,19 @@ for i = 1:I
             tx_pos_z(j,i) = tx_pos_xyz1(3); tx_vel_z(j,i) = tx_vel_xyz1(3);
 
             tx_clk_bias(j,i) = tx_clk_bias1;
+           
 
-            prn_code(j,i) = prn1;           sv_num(j,i) = sv_num1;
+            prn_code(j,i) = prn1;           
+            sv_num(j,i) = sv_num1;
             track_id(j,i) = find(trans_id_unique == transmitter_id1);
-
+    
         end
 
     end
 end
+%}
 
+% extend to RHCP channels
 tx_pos_x(J/2+1:J,:) = tx_pos_x(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
 tx_pos_y(J/2+1:J,:) = tx_pos_y(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
 tx_pos_z(J/2+1:J,:) = tx_pos_z(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
@@ -1319,7 +1430,6 @@ for i = 1:I
         if prn1 == 28
             quality_flag1_1(24) = 1;
         end
-
 
         % flag 1
         if (quality_flag1_1(3) == 1 || ...
