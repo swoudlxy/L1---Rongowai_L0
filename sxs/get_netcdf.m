@@ -4,7 +4,7 @@ L1_dict = readtable(L1_dict_name);
 L1_dict = string(table2cell(L1_dict));
 
 field_names = fieldnames(L1_postCal);
-field_names(118) = [];                  % debug only
+field_names(117) = [];                  % debug only
 
 L = length(field_names);
 

@@ -1,6 +1,9 @@
 % This function solves all L1 variables and packets as a structure for
 % processing multiple L0 files
 
+% L1 Algorithm version: 1.1
+% L1 data version: 1.11
+
 function L1_postCal = get_L1_product(   L0_filename, ...
                                         L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm, ...
                                         dem,dtu10,landmask_nz,lcv_mask,water_mask, ...
@@ -235,9 +238,9 @@ for i = 1:I
     
     % derive ddm_gps_week and ddm_gps_sec
     D_ddm1 = datetime(ddm_utc1,'ConvertFrom','posixtime');
-    [year,month,day] = ymd(D_ddm1);
+    [year,month,date] = ymd(D_ddm1);
     [hour,mins,secs] = hms(D_ddm1);
-    [ddm_gps_week1,ddm_gps_sec1] = utc2gpstime(year,month,day,hour,mins,secs);
+    [ddm_gps_week1,ddm_gps_sec1] = utc2gpstime(year,month,date,hour,mins,secs);
 
     % save pvt and ddm timestamps for interpolation
     pvt_utc(i) = pvt_utc1;          ddm_utc(i) = ddm_utc1;
@@ -308,6 +311,13 @@ time_coverage_duration = ['P0DT' num2str(hours) 'H' num2str(minutes) 'M' num2str
 
 L1_postCal.time_coverage_duration = time_coverage_duration;
 
+% below is new for algorithm version 1.1
+ref_timestamp_utc = ddm_utc(1);
+
+pvt_timestamp_utc = pvt_utc-ref_timestamp_utc;
+ddm_timestamp_utc = ddm_utc-ref_timestamp_utc;
+% ends
+
 L1_postCal.aircraft_reg = 'ZK-NFA';             % default value
 L1_postCal.ddm_source = 2;                      % 1 = GPS signal simulator, 2 = aircraft
 L1_postCal.ddm_time_type_selector = 1;          % 1 = middle of DDM sampling period
@@ -333,11 +343,11 @@ L1_postCal.per_bin_ant_version = '1';
 % write timestamps and ac-related variables
 L1_postCal.pvt_timestamp_gps_week = pvt_gps_week;
 L1_postCal.pvt_timestamp_gps_sec = pvt_gps_sec;
-L1_postCal.pvt_timestamp_utc = pvt_utc;
+L1_postCal.pvt_timestamp_utc = pvt_timestamp_utc;       % algorithm version 1.1
 
 L1_postCal.ddm_timestamp_gps_week = gps_week;
 L1_postCal.ddm_timestamp_gps_sec = gps_tow;
-L1_postCal.ddm_timestamp_utc = ddm_utc;
+L1_postCal.ddm_timestamp_utc = ddm_timestamp_utc;       % algorithm version 1.1
 
 L1_postCal.ddm_pvt_bias = ddm_pvt_bias;
 
@@ -416,6 +426,23 @@ else
     change_idx = find(ischange(dow)==1);
 end
 
+% compensate 0s in front of doy
+if doy1 < 10
+    doy1 = ['00' num2str(doy1)];
+elseif doy1 < 100
+    doy1 = ['0' num2str(doy1)];
+else
+    doy1 = num2str(doy1);
+end
+
+if doy2 < 10
+    doy2 = ['00' num2str(doy2)];
+elseif doy2 < 100
+    doy2 = ['0' num2str(doy2)];
+else
+    doy2 = num2str(doy2);
+end
+
 % initalise variables 
 tx_pos_x = zeros(J,I)+invalid;      tx_vel_x = zeros(J,I)+invalid;
 tx_pos_y = zeros(J,I)+invalid;      tx_vel_y = zeros(J,I)+invalid;
@@ -445,16 +472,16 @@ for i = 1:I
             % assign correct sp3 files if the flight cross two dates
             if flag == 0
 
-                sp3_filename = ['IGS0OPSRAP_' num2str(year1) num2str(doy1) '0000_01D_15M_ORB.sp3'];
+                sp3_filename = ['IGS0OPSRAP_' num2str(year1) doy1 '0000_01D_15M_ORB.SP3'];
                 gps_orbit_filename = ['..//dat//orbits//' sp3_filename];                
 
             elseif flag == 1
                 if i<change_idx
-                    sp3_filename = ['IGS0OPSRAP_' num2str(year1) num2str(doy1) '0000_01D_15M_ORB.sp3'];
+                    sp3_filename = ['IGS0OPSRAP_' num2str(year1) doy1 '0000_01D_15M_ORB.SP3'];
                     gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
 
                 elseif i>=change_idx
-                    sp3_filename = ['IGS0OPSRAP_' num2str(year2) num2str(doy2) '0000_01D_15M_ORB.sp3'];
+                    sp3_filename = ['IGS0OPSRAP_' num2str(year2) doy2 '0000_01D_15M_ORB.SP3'];
                     gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
                 
                 end
@@ -786,7 +813,8 @@ gps_tx_power_db_w = zeros(J,I)+invalid;
 gps_ant_gain_db_i = zeros(J,I)+invalid;
 static_gps_eirp = zeros(J,I)+invalid;
 
-sx_rx_gain = zeros(J,I)+invalid;
+sx_rx_gain_copol = zeros(J,I)+invalid;
+sx_rx_gain_xpol = zeros(J,I)+invalid;
 
 for i = 1:I
 
@@ -826,7 +854,7 @@ for i = 1:I
             if LOS_flag1 == 1
 
                 sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
-                surface_type1 = get_surf_type(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);
+                surface_type1 = get_surf_type2(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);    % algorithm version 1.11
 
                 % derive sx velocity
                 dt = 1;                                         % time step in second
@@ -883,8 +911,13 @@ for i = 1:I
                 gps_ant_gain_db_i(j,i) = gps_rad1(2);
                 static_gps_eirp(j,i) = gps_rad1(3);
 
-                sx_rx_gain(j,i) = sx_rx_gain_LHCP1(1);      % LHCP channel rx gain
-                sx_rx_gain(j+J/2,i) = sx_rx_gain_RHCP1(2);  % RHCP channel rx gain
+                sx_rx_gain_copol(j,i) = sx_rx_gain_LHCP1(1);      % LHCP channel LHCP rx gain
+                sx_rx_gain_copol(j+J/2,i) = sx_rx_gain_RHCP1(2);  % RHCP channel RHCP rx gain
+
+                % algorithm version 1.11 changes
+                sx_rx_gain_xpol(j,i) = sx_rx_gain_LHCP1(2);       % LHCP channel RHCP rx gain
+                sx_rx_gain_xpol(j+J/2,i) = sx_rx_gain_RHCP1(1);   % RHCP channel LHCP rx gain
+                % end
                               
             end
         end
@@ -956,7 +989,8 @@ L1_postCal.sp_az_body = sx_az_body;
 L1_postCal.sp_theta_enu = sx_theta_enu;
 L1_postCal.sp_az_enu = sx_az_enu;
 
-L1_postCal.sp_rx_gain = sx_rx_gain;
+L1_postCal.sp_rx_gain_copol = sx_rx_gain_copol;
+L1_postCal.sp_rx_gain_xpol = sx_rx_gain_xpol;       % algorithm version 1.11
 
 L1_postCal.gps_off_boresight_angle_deg = gps_boresight;
 
@@ -1145,7 +1179,7 @@ for i = 1:I
         dist_to_coast1 = dist_to_coast_km(j,i);
 
         eirp_watt1 = static_gps_eirp(j,i);
-        rx_gain_db_i1 = sx_rx_gain(j,i);
+        rx_gain_db_i1 = sx_rx_gain_copol(j,i);
         TSx1 = tx_to_sp_range(j,i);
         RSx1 = rx_to_sp_range(j,i);
         
@@ -1412,7 +1446,7 @@ for i = 1:I
         end
 
         % flag 20
-        rx_gain1 = sx_rx_gain(j,i);
+        rx_gain1 = sx_rx_gain_copol(j,i);
         if (rx_gain1 == invalid) && (~isnan(prn_code1))
             quality_flag1_1(20) = 1;
         end

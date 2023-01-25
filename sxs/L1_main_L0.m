@@ -14,7 +14,7 @@ clc
 
 % load L0 netCDF
 path1 = '../dat/raw/';
-L0_filename = [path1 '20221101-064735_NZAA-NZTG.nc'];
+L0_filename = [path1 '20230102-140740_NZCH-NZNV.nc'];
 
 % PVT GPS week and sec
 pvt_gps_week = double(ncread(L0_filename,'/science/GPS_week_of_SC_attitude'));
@@ -519,6 +519,23 @@ else
     change_idx = find(ischange(dow)==1);
 end
 
+% compensate 0s in front of doy
+if doy1 < 10
+    doy1 = ['00' num2str(doy1)];
+elseif doy1 < 100
+    doy1 = ['0' num2str(doy1)];
+else
+    doy1 = num2str(doy1);
+end
+
+if doy2 < 10
+    doy2 = ['00' num2str(doy2)];
+elseif doy2 < 100
+    doy2 = ['0' num2str(doy2)];
+else
+    doy2 = num2str(doy2);
+end
+
 % initalise variables 
 tx_pos_x = zeros(J,I)+invalid;      tx_vel_x = zeros(J,I)+invalid;
 tx_pos_y = zeros(J,I)+invalid;      tx_vel_y = zeros(J,I)+invalid;
@@ -548,16 +565,16 @@ for i = 1:I
             % assign correct sp3 files if the flight cross two dates
             if flag == 0
 
-                sp3_filename = ['IGS0OPSRAP_' num2str(year1) num2str(doy1) '0000_01D_15M_ORB.sp3'];
+                sp3_filename = ['IGS0OPSRAP_' num2str(year1) doy1 '0000_01D_15M_ORB.SP3'];
                 gps_orbit_filename = ['..//dat//orbits//' sp3_filename];                
 
             elseif flag == 1
                 if i<change_idx
-                    sp3_filename = ['IGS0OPSRAP_' num2str(year1) num2str(doy1) '0000_01D_15M_ORB.sp3'];
+                    sp3_filename = ['IGS0OPSRAP_' num2str(year1) doy1 '0000_01D_15M_ORB.SP3'];
                     gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
 
                 elseif i>=change_idx
-                    sp3_filename = ['IGS0OPSRAP_' num2str(year2) num2str(doy2) '0000_01D_15M_ORB.sp3'];
+                    sp3_filename = ['IGS0OPSRAP_' num2str(year2) doy2 '0000_01D_15M_ORB.SP3'];
                     gps_orbit_filename = ['..//dat//orbits//' sp3_filename];
                 
                 end
