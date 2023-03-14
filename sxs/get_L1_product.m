@@ -1,8 +1,8 @@
 % This function solves all L1 variables and packets as a structure for
 % processing multiple L0 files
 
-% L1 Algorithm version: 1.1
-% L1 data version: 1.11
+% L1 Algorithm version: 1.2.1
+% L1 data version: 1.2.0
 
 function L1_postCal = get_L1_product(   L0_filename, ...
                                         L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm, ...
@@ -84,6 +84,28 @@ rx_yaw_pvt = rx_yaw_pvt(index1);
 
 rx_clk_bias_m_pvt = rx_clk_bias_m_pvt(index1);
 rx_clk_drift_mps_pvt = rx_clk_drift_mps_pvt(index1);
+
+% remove first and last few zeros
+index0_b = find(pvt_gps_week>0,1);
+index0_e = find(pvt_gps_week>0,1,'last');
+
+pvt_gps_week = pvt_gps_week(index0_b:index0_e);
+pvt_gps_sec = pvt_gps_sec(index0_b:index0_e);
+
+rx_pos_x_pvt = rx_pos_x_pvt(index0_b:index0_e);
+rx_pos_y_pvt = rx_pos_y_pvt(index0_b:index0_e);
+rx_pos_z_pvt = rx_pos_z_pvt(index0_b:index0_e);
+
+rx_vel_x_pvt = rx_vel_x_pvt(index0_b:index0_e);
+rx_vel_y_pvt = rx_vel_y_pvt(index0_b:index0_e);
+rx_vel_z_pvt = rx_vel_z_pvt(index0_b:index0_e);
+
+rx_roll_pvt = rx_roll_pvt(index0_b:index0_e);
+rx_pitch_pvt = rx_pitch_pvt(index0_b:index0_e);
+rx_yaw_pvt = rx_yaw_pvt(index0_b:index0_e);
+
+rx_clk_bias_m_pvt = rx_clk_bias_m_pvt(index0_b:index0_e);
+rx_clk_drift_mps_pvt = rx_clk_drift_mps_pvt(index0_b:index0_e);
 
 % identify and compensate the value equal to 0 (randomly happens)
 index0 = find(pvt_gps_week==0);
@@ -326,8 +348,8 @@ L1_postCal.dopp_resolution = 500;               % unit in Hz
 L1_postCal.dem_source = 'SRTM30';
 
 % write algorithm and LUT versions
-L1_postCal.l1_algorithm_version = '1';
-L1_postCal.l1_data_version = '1';
+L1_postCal.l1_algorithm_version = '1.1';
+L1_postCal.l1_data_version = '1.12';
 L1_postCal.l1a_sig_LUT_version = '1';
 L1_postCal.l1a_noise_LUT_version = '1';
 L1_postCal.ngrx_port_mapping_version = '1';
@@ -623,8 +645,8 @@ offset = 4;                         % offset delay rows to derive noise floor
 ddm_power_counts = zeros(5,40,J,I)+invalid;
 power_analog = zeros(5,40,J,I)+invalid;
 
-noise_floor_counts = zeros(J,I)+invalid;
-noise_floor = zeros(J,I)+invalid;
+%noise_floor_counts = zeros(J,I)+invalid;
+%noise_floor = zeros(J,I)+invalid;
 snr_db = zeros(J,I)+invalid;
 
 peak_ddm_counts = zeros(J,I)+invalid;
@@ -632,10 +654,10 @@ peak_ddm_watts = zeros(J,I)+invalid;
 peak_delay_bin = zeros(J,I)+invalid;
 
 ddm_noise_counts = zeros(J,I)+invalid;
-ddm_noise_watts = zeros(J,I)+invalid;
+%ddm_noise_watts = zeros(J,I)+invalid;
 
 ddm_ant = zeros(J,I)+invalid;
-inst_gain = zeros(J,I)+invalid;
+%inst_gain = zeros(J,I)+invalid;
 
 % derive signal power
 for i = 1:I
@@ -664,9 +686,10 @@ for i = 1:I
                 L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm,std_dev1);
 
             % noise floor in counts for each DDM
+            % updated for ver. 1.21
             ddm_noise_counts1 = mean(ddm_power_counts1(:,end-offset:end),'all');
-            ddm_noise_watts1 = L1a_counts2watts(ddm_noise_counts1,ANZ_port1, ...
-                L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm,std_dev1);
+            %ddm_noise_watts1 = L1a_counts2watts(ddm_noise_counts1,ANZ_port1, ...
+            %    L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm,std_dev1);
 
             % peak ddm location
             peak_ddm_counts1 = max(max(ddm_power_counts1));
@@ -681,7 +704,7 @@ for i = 1:I
             ddm_ant(j,i) = ANZ_port1;            
 
             ddm_noise_counts(j,i) = ddm_noise_counts1;
-            ddm_noise_watts(j,i) = ddm_noise_watts1;
+            %ddm_noise_watts(j,i) = ddm_noise_watts1;
 
             peak_ddm_counts(j,i) = peak_ddm_counts1;
             peak_ddm_watts(j,i) = peak_ddm_watts1;
@@ -692,6 +715,10 @@ for i = 1:I
     end    
 end
 
+% changed in ver 1.21, may bring back in a future version
+% noise floor, SNR and instrument gain will be solved after getting
+% specular coordinates
+%{
 % derive noise floor, SNR and instrument gain
 for i = 1:I
 
@@ -762,16 +789,16 @@ for i = 1:I
         end
     end
 end
-
+%}
 % save outputs to L1 structure
 L1_postCal.raw_counts = ddm_power_counts;
 L1_postCal.l1a_power_ddm = power_analog;
 L1_postCal.zenith_sig_i2q2 = zenith_i2q2;
 
-L1_postCal.ddm_noise_floor = noise_floor;
-L1_postCal.ddm_snr = snr_db;
+%L1_postCal.ddm_noise_floor = noise_floor;
+%L1_postCal.ddm_snr = snr_db;
 
-L1_postCal.inst_gain = inst_gain;
+%L1_postCal.inst_gain = inst_gain;
 L1_postCal.ddm_ant = ddm_ant;
 
 % Part 3 ends
@@ -917,8 +944,7 @@ for i = 1:I
                 % algorithm version 1.11 changes
                 sx_rx_gain_xpol(j,i) = sx_rx_gain_LHCP1(2);       % LHCP channel RHCP rx gain
                 sx_rx_gain_xpol(j+J/2,i) = sx_rx_gain_RHCP1(1);   % RHCP channel LHCP rx gain
-                % end
-                              
+                                              
             end
         end
 
@@ -961,6 +987,105 @@ static_gps_eirp(J/2+1:J,:) = static_gps_eirp(1:J/2,:);
 gps_tx_power_db_w(J/2+1:J,:) = gps_tx_power_db_w(1:J/2,:);
 gps_ant_gain_db_i(J/2+1:J,:) = gps_ant_gain_db_i(1:J/2,:);
 
+% derive noise floor, SNR and instrument gain
+% new change in ver 1.21
+snr_LHCP = zeros(J/2,I)+invalid;
+snr_RHCP = zeros(J/2,I)+invalid;
+
+snr_flag_LHCP = zeros(J/2,I)+invalid;
+snr_flag_RHCP = zeros(J/2,I)+invalid;
+
+inst_gain_LHCP = zeros(J/2,I)+invalid;
+inst_gain_RHCP = zeros(J/2,I)+invalid;
+
+noise_floor_LHCP_all = ddm_noise_counts(1:J/2,:);
+noise_floor_RHCP_all = ddm_noise_counts(J/2+1:J,:);
+
+peak_delay_row_LHCP = peak_delay_bin(1:J/2,:);
+peak_delay_row_RHCP = peak_delay_bin(J/2+1:J,:);
+
+% evaluate new noise floor
+dist_to_coast_LHCP = dist_to_coast_km(1:10,:);
+ocean_idx = find(dist_to_coast_LHCP<-5);
+
+if ~isempty(ocean_idx)          % with ocean DDMs
+    noise_floor_LHCP_ocean = noise_floor_LHCP_all(ocean_idx);
+    noise_floor_LHCP = mean(noise_floor_LHCP_ocean(noise_floor_LHCP_ocean>0));
+
+    noise_floor_RHCP_ocean = noise_floor_RHCP_all(ocean_idx);
+    noise_floor_RHCP = mean(noise_floor_RHCP_ocean(noise_floor_RHCP_ocean>0));
+
+elseif isempty(ocean_idx)       % without ocean DDMs
+    peak_row_idx_LHCP = peak_delay_row_LHCP<30;
+    noise_floor_LHCP_land = noise_floor_LHCP_all(peak_row_idx_LHCP);
+    noise_floor_LHCP = mean(noise_floor_LHCP_land);
+
+    peak_row_idx_RHCP = peak_delay_row_RHCP<30;
+    noise_floor_RHCP_land = noise_floor_RHCP_all(peak_row_idx_RHCP);
+    noise_floor_RHCP = mean(noise_floor_RHCP_land);
+
+end
+
+for j = 1:J/2
+    for i = 1:I
+
+        peak_counts_LHCP1 = peak_ddm_counts(j,i);
+        peak_counts_RHCP1 = peak_ddm_counts(j+J/2,i);
+
+        peak_signal_watts_LHCP1 = peak_ddm_watts(j,i);
+        peak_signal_watts_RHCP1 = peak_ddm_watts(j+J/2,i);
+
+        if ~isnan(peak_counts_LHCP1)
+            peak_signal_LHCP1 = peak_counts_LHCP1-noise_floor_LHCP;
+
+            if peak_signal_LHCP1>0           
+                snr_LHCP1 = peak_signal_LHCP1/noise_floor_LHCP;               
+                snr_flag_LHCP1 = 0;
+            
+            elseif peak_signal_LHCP1<=0
+                snr_LHCP1 = nan;
+                snr_flag_LHCP1 = 1;
+                
+            end
+            
+            snr_LHCP(j,i) = pow2db(snr_LHCP1);
+            snr_flag_LHCP(j,i) = snr_flag_LHCP1;
+
+        end
+
+        if ~isnan(peak_counts_RHCP1)
+            peak_signal_RHCP1 = peak_counts_RHCP1-noise_floor_RHCP;
+            
+            if peak_signal_RHCP1>0
+                snr_RHCP1 = peak_signal_RHCP1/noise_floor_RHCP; 
+                snr_flag_RHCP1 = 0;
+          
+            elseif peak_signal_RHCP1<=0
+                snr_RHCP1 = nan;
+                snr_flag_RHCP1 = 1;
+            
+            end
+
+            snr_RHCP(j,i) = pow2db(snr_RHCP1);
+            snr_flag_RHCP(j,i) = snr_flag_RHCP1;
+
+        end
+
+        inst_gain_LHCP1 = peak_counts_LHCP1/peak_signal_watts_LHCP1;
+        inst_gain_RHCP1 = peak_counts_RHCP1/peak_signal_watts_RHCP1;
+
+        inst_gain_LHCP(j,i) = inst_gain_LHCP1;
+        inst_gain_RHCP(j,i) = inst_gain_RHCP1;
+
+    end
+end
+
+ddm_snr = [snr_LHCP;snr_RHCP];
+ddm_noise_floor = [repmat(noise_floor_LHCP,[10,I]);repmat(noise_floor_RHCP,[10,I])];
+ddm_snr_flag = [snr_flag_LHCP;snr_flag_RHCP];
+
+inst_gain = [inst_gain_LHCP;inst_gain_RHCP];
+
 % save variables
 L1_postCal.sp_pos_x = sx_pos_x;
 L1_postCal.sp_pos_y = sx_pos_y;
@@ -997,6 +1122,12 @@ L1_postCal.gps_off_boresight_angle_deg = gps_boresight;
 L1_postCal.static_gps_eirp = static_gps_eirp;
 L1_postCal.gps_tx_power_db_w = gps_tx_power_db_w;
 L1_postCal.gps_ant_gain_db_i = gps_ant_gain_db_i;
+
+L1_postCal.ddm_noise_floor = ddm_noise_floor;
+L1_postCal.ddm_snr = ddm_snr;
+L1_postCal.ddm_snr_flag = ddm_snr_flag;
+
+L1_postCal.inst_gain = inst_gain;
 
 % Part 4B: BRCS/NBRCS, reflectivity, coherent status and fresnel zone
 %clc

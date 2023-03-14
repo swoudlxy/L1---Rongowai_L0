@@ -94,7 +94,7 @@ RHCP_pattern.RHCP = RHCP_R_gain_db_i;
 phy_ele_size = readmatrix('../dat/dem/phy_ele_size.dat');
 
 % L1 dictionary name
-L1_dict_name = '../dat/L1_Dict/L1_Dict_v2.xlsx';
+L1_dict_name = '../dat/L1_Dict/L1_Dict_v1_2_1.xlsx';
 
 %% get post-calibrated L1 product
 clc
@@ -117,9 +117,9 @@ for l = 1:L
     save(['../out/L1_postCalData/' filename(1:end-3) '_L1.mat'],'L1_postCal','-v7.3');
 
     % the below packets the L1 products as a netCDF
-    L1_netCDF = [filename '_L1.nc'];    % L1 in the filename to distinguish from L0 products
+    L1_netCDF = ['../out/L1_netCDFs/' filename(1:end-3) '_L1.nc'];
     sample_info = get_netcdf(L1_netCDF,L1_dict_name,L1_postCal);
-
+    
     disp(l);    % display the number of files being processed
 
 end
