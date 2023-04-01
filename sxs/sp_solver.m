@@ -18,7 +18,7 @@ LOS_flag = los_status(tx_pos_xyz,rx_pos_xyz);
 if LOS_flag == 1
         
     % step 1 - derive SP coordinate on WGS84 and DTU10
-    [~,sx_lla_coarse] = coarsetune(tx_pos_xyz,rx_pos_xyz);
+    [sx_xyz_coarse,sx_lla_coarse] = coarsetune(tx_pos_xyz,rx_pos_xyz);
 
     L_ocean_deg = 1;                            % initial searching region in degrees
     res_ocean_meter = 0.01;                     % converge criteria 0.01 meter
@@ -40,9 +40,9 @@ if LOS_flag == 1
         local_height = local_height(2,2);       % local height of the SP
 
         % projection to local dem
-        term1 = sx_pos_xyz/norm(sx_pos_xyz);
+        term1 = sx_xyz_coarse/norm(sx_xyz_coarse);
         term2 = term1*local_height;
-        sx_pos_xyz = sx_pos_xyz+term2;
+        sx_pos_xyz = sx_xyz_coarse+term2;
 
     end
 
