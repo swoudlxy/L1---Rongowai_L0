@@ -9,12 +9,6 @@ function [fresnel_coeff,fresnel_axis,fresnel_orientation] = get_fresnel(tx_pos_x
 wgs84 = wgs84Ellipsoid('meter');
 eps_ocean = 74.62+1j*51.92;         % complex permittivity of ocean
 
-% sparse structures
-%tx_pos_xyz = tx.tx_pos_xyz;
-%rx_pos_xyz = rx.rx_pos_xyz;
-%sx_pos_xyz = sx.sx_pos_xyz;
-%dist_to_coast = sx.dist_to_coast;
-
 % define constants
 fc = 1575.42e6;             % operating frequency
 c = 299792458;              % speed of light
@@ -28,8 +22,8 @@ term1 = R_tsp*R_rsp;
 term2 = R_tsp+R_rsp;
 
 % semi axis
-a = sqrt(lambda*term1/term2);   % major semi
-b = a/cosd(inc_angle);          % minor semi
+a = sqrt(lambda*term1/term2);   % minor semi
+b = a/cosd(inc_angle);          % major semi
 
 % compute orientation relative to North
 sx_lla = ecef2lla(sx_pos_xyz);
@@ -48,7 +42,7 @@ term4 = norm(vector_tr)*norm(unit_north);
 
 theta = acosd(term3/term4);
 
-fresnel_axis = [2*a 2*b];
+fresnel_axis = [2*b 2*a];
 fresnel_orientation = theta;
 
 % fresenel coefficient only compute for ocean SPs

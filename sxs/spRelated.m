@@ -25,7 +25,8 @@ rx_att = rx.rx_attitude;
 % compute angles
 [theta_gps,~] = ecef2orf(tx_pos_xyz,tx_vel_xyz,sx_pos_xyz);
 
-[sp_theta_body,sp_az_body] = ecef2brf(rx_pos_xyz,rx_vel_xyz,sx_pos_xyz,rx_att);
+% correct for using radians for ac Euler angles
+[sp_theta_body,sp_az_body] = ecef2brf3(rx_pos_xyz,rx_vel_xyz,sx_pos_xyz,rx_att);
 [sp_theta_enu,sp_az_enu] = ecef2enuf(rx_pos_xyz,sx_pos_xyz);
 
 sp_angle_body = [sp_theta_body,sp_az_body];

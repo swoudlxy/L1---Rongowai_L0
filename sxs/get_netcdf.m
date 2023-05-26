@@ -3,8 +3,9 @@ function sample_info = get_netcdf(L1_netCDF_name,L1_dict_name,L1_postCal)
 L1_dict = readtable(L1_dict_name);
 L1_dict = string(table2cell(L1_dict));
 
+L1_postCal = rmfield(L1_postCal,'A_eff_all');
 field_names = fieldnames(L1_postCal);
-field_names(117) = [];                  % debug only
+%field_names(117) = [];                  % debug only
 
 L = length(field_names);
 

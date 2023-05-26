@@ -1,14 +1,15 @@
-function chi2 = get_chi2(num_delay_bins,num_doppler_bins)
+% this function gets 2D AF
+
+function chi2 = get_chi2(num_delay_bins,num_doppler_bins, ...
+    delay_center_bin,doppler_center_bin, ...
+    delay_res,doppler_res)
 
 chip_rate = 1.023e6;
 tau_c = 1/chip_rate;
 T_coh = 1/1000;
 
-delay_res = 0.25;
-doppler_res = 500;
-
-delay_center_bin = 21;
-doppler_center_bin = 3;
+%delay_res = 1023000/8192000;    % corrected delay resolution
+%doppler_res = 250;              % corrected doppler resolution
 
 chi = zeros(num_doppler_bins,num_delay_bins);
 

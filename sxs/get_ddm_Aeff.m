@@ -9,10 +9,10 @@
 % 1) A_eff: effective scattering area
 % 2) sp_delay_bin,sp_doppler_bin: floating specular bin
 
-function [A_eff,A_eff_all] = get_ddm_Aeff(tx,rx,sx,local_dem,phy_ele_size,chi2)
+function [A_eff,A_eff_all,A_phy] = get_ddm_Aeff(tx,rx,sx,local_dem,phy_ele_size,chi2)
 
-delay_res = 0.25;
-doppler_res = 500;
+delay_res = 1023000/8192000;            % corrected delay resolution
+doppler_res = 250;                      % corrected doppler resolution                        
 
 % sparse structures
 tx_pos_xyz = tx.tx_pos_xyz;
@@ -103,4 +103,5 @@ end
 % convolution to A_eff
 A_eff1 = conv2(A_phy,chi2);
 A_eff = A_eff1(3:7,20:59);          % cut suitable size for A_eff
+%A_eff = A_eff1(3:7,1:40);
 A_eff_all = A_eff1;

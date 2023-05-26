@@ -17,11 +17,11 @@ L1a_path = '../dat/L1a_cal/';
 L1a_cal_ddm_counts_db = readmatrix([L1a_path 'L1A_cal_ddm_counts_dB.dat']);
 L1a_cal_ddm_power_dbm = readmatrix([L1a_path 'L1A_cal_ddm_power_dBm.dat']);
 
-% load SRTM_30 DEM
+% load SRTM DEM
 dem_path = '../dat/dem/';
-dem_file = 'nzsrtm_30_v1.tif';
+dem_file = 'dem_200m.dat';
 
-dem = get_dem([dem_path dem_file]);
+dem = get_dem2([dem_path dem_file]); 
 
 % load DTU10 model
 dtu_path = '../dat/dtu/';
