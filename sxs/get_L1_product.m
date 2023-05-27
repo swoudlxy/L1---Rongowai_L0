@@ -243,8 +243,10 @@ nadir_ant_temp_eng = nadir_ant_temp_eng(index3);
 zenith_ant_temp_eng = zenith_ant_temp_eng(index3);
 
 invalid = nan;                              % defines the value to be used for invalid fields
-I = length(pvt_gps_sec);                    % total length of samples
-J = 20;                                     % maximal NGRx capacity
+
+% M,N:number of doppler col and delay rows
+% I,J:number of timestamps and NGRx capacity
+[M,N,J,I] = size(raw_counts);
 
 % initialise a structure to save L1 results
 L1_postCal = struct;
@@ -284,7 +286,7 @@ for i = 1:I
     % save pvt and ddm timestamps for interpolation
     pvt_utc(i) = pvt_utc1;          ddm_utc(i) = ddm_utc1;
     gps_week(i) = ddm_gps_week1;    gps_tow(i) = ddm_gps_sec1;
-    ddm_pvt_bias(i) = non_coherent1/2;
+    ddm_pvt_bias(i) = int_duration1/2;
 
 end
 
@@ -799,7 +801,7 @@ for i = 1:I
                 dt = 1;                                         % time step in second
                 tx_pos_xyz_dt = tx_pos_xyz1+dt*tx_vel_xyz1;
                 rx_pos_xyz_dt = rx_pos_xyz1+dt*rx_vel_xyz1;
-                [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem_200m,dtu10,landmask_nz);
+                [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem,dtu10,landmask_nz);
 
                 sx_vel_xyz1 = (sx_pos_xyz_dt-sx_pos_xyz1)/dt;            
 
@@ -1156,7 +1158,7 @@ for j = 1:J/2
         snr_LHCP1 = snr_LHCP_db(j,i);
         doppler_center1 = doppler_center_hz(j,i);
 
-        if ~isnan(tx_pos_x(i,j))
+        if ~isnan(tx_pos_x(j,i))
 
             % doppler of SP
             [~,sx_doppler_hz1,~] = deldop(tx_pos_xyz1,rx_pos_xyz1,tx_vel_xyz1,rx_vel_xyz1,sx_pos_xyz1);
@@ -1178,7 +1180,7 @@ for j = 1:J/2
             end
 
             confidence_flag(j,i) = confidence_flag1;
-            sp_dopp_error(j,i) = sx_doppler_erro1;
+            sp_dopp_error(j,i) = sx_doppler_error1;
 
         end
 
@@ -1187,7 +1189,7 @@ end
 
 % expand to RHCP channels
 confidence_flag(J/2+1:J,:) = confidence_flag(1:J/2,:);
-sp_dopp_error(J/2+1:J,:) = sp_dopp_error(1:j/2,:);
+sp_dopp_error(J/2+1:J,:) = sp_dopp_error(1:J/2,:);
 
 L1_postCal.confidence_flag = confidence_flag;
 L1_postCal.sp_dopp_error = sp_dopp_error;
@@ -1240,10 +1242,10 @@ for i = 1:I
                 gps_eirp1,rx_gain_dbi_1,R_tsx1,R_rsx1);
 
             % reflectivity at SP
-            delay_row1 = sp_delay_row(j,i)+1;
+            delay_row1 = floor(sp_delay_row(j,i))+1;
             doppler_col1 = sp_doppler_col(j,i)+1;
 
-            if delay_row1<=40 && delay_row1>=0      % ensure sp within DDM range
+            if delay_row1<=40 && delay_row1>0      % ensure sp within DDM range
                 sp_refl_copol1 = refl_copol1(doppler_col1,delay_row1);
                 sp_refl_xpol1 = refl_xpol1(doppler_col1,delay_row1);
 
@@ -1253,10 +1255,10 @@ for i = 1:I
 
             end
 
-            refl_waveform_copol1 = sum(ref_copol1,1);
+            refl_waveform_copol1 = sum(refl_copol1,1);
             norm_refl_waveform_copol1 = refl_waveform_copol1/max(refl_waveform_copol1);
 
-            refl_waveform_xpol1 = sum(ref_xpol1,1);
+            refl_waveform_xpol1 = sum(refl_xpol1,1);
             norm_refl_waveform_xpol1 = refl_waveform_xpol1/max(refl_waveform_xpol1);
 
             brcs_copol(:,:,j,i) = brcs_copol1;
@@ -1295,8 +1297,8 @@ L1_postCal.norm_refl_waveform = norm_refl_waveform;
 A_eff = zeros(M,N,J,I)+invalid;
 nbrcs_scatter_area = zeros(J,I)+nan;
 
-nbrcs_copol = zeros(J,I)+nan;
-nbrcs_xpol = zeros(J,I)+nan;
+nbrcs_copol = zeros(J/2,I)+nan;
+nbrcs_xpol = zeros(J/2,I)+nan;
 
 coherency_ratio = zeros(J,I)+invalid;
 coherency_state = zeros(J,I)+invalid;
@@ -1343,7 +1345,7 @@ for i = 1:I
             dist_to_coast1 = dist_to_coast_km(j,i);
         
             L = 12200; grid_res = 200; %num_grids = L/grid_res;
-            local_dem1 = get_local_dem(sx_lla1,L,grid_res,dem_200m,dtu10,dist_to_coast1);
+            local_dem1 = get_local_dem(sx_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
 
             % effective scattering area A_eff
             [A_eff1,~,~] = get_ddm_Aeff3(tx1,rx1,sx1,delay_bin_res,doppler_bin_res, ...
@@ -1415,7 +1417,7 @@ for i = 1:I
         dist_to_coast1 = dist_to_coast_km(j,i);
         ddm_ant1 = ddm_ant(j,i);
 
-        if ~isnan(tx_pos_x(j,i))
+        if ~isnan(ddm_ant1)
 
             [fresnel_coeff1,fresnel_axis1,fresnel_orientation1] = get_fresnel(tx_pos_xyz1, ...
                 rx_pos_xyz1,sx_pos_xyz1,dist_to_coast1,inc_angle1,ddm_ant1);
@@ -1441,13 +1443,15 @@ nbrcs_cross_pol = zeros(J,I)+invalid;
 for i = 1:I
     for j = 1:J/2
 
-        nbrcs_LHCP_v1 = ddm_nbrcs_v1(j,i);
-        nbrcs_RHCP_v1 = ddm_nbrcs_v1(j+J/2,i);
+        nbrcs_LHCP1 = ddm_nbrcs(j,i);
+        nbrcs_RHCP1 = ddm_nbrcs(j+J/2,i);
 
-        CP1 = nbrcs_LHCP_v1/nbrcs_RHCP_v1;
-        CP_db1 = pow2db(CP1);
-
-        nbrcs_cross_pol(j,i) = CP_db1;
+        CP1 = nbrcs_LHCP1/nbrcs_RHCP1;
+        if CP1>0
+            CP_db1 = pow2db(CP1);
+            nbrcs_cross_pol(j,i) = CP_db1;
+            
+        end        
 
     end
 end
@@ -1494,10 +1498,10 @@ for i = 1:I
         end
 
         % flag 7 and 10
-        snr_db1 = snr_db(j,i);
+        snr_db1 = ddm_snr(j,i);
 
         if i > 1
-            snr_db2 = snr_db(j,i-1);
+            snr_db2 = ddm_snr(j,i-1);
             diff1 = (db2pow(snr_db1)-db2pow(snr_db2))/db2pow(snr_db1);
             diff2 = snr_db1-snr_db2;
 
@@ -1542,22 +1546,22 @@ for i = 1:I
         end
 
         % flag 15 and 16
-        sp_delay_row = brcs_ddm_sp_bin_delay_row(j,i);
-        sp_dopp_col = brcs_ddm_sp_bin_dopp_col(j,i);
+        sp_delay_row1 = sp_delay_row(j,i);
+        sp_dopp_col1 = sp_doppler_col(j,i);
 
-        if (sp_delay_row<15)||(sp_delay_row>35)
+        if (sp_delay_row1<15)||(sp_delay_row1>35)
             quality_flag1_1(15) = 1;
         end
 
-        if (sp_dopp_col<2)||(sp_dopp_col>4)
+        if (sp_dopp_col1<2)||(sp_dopp_col1>4)
             quality_flag1_1(16) = 1;
         end
 
         % flag 17
-        if (floor(sp_delay_row) < 38) && (floor(sp_delay_row) > 0) && ...
-                (floor(sp_dopp_col) < 5) && (floor(sp_dopp_col) > 1)
-            brcs_ddma = brcs(floor(sp_dopp_col)-1:floor(sp_dopp_col)+1, ...
-                            floor(sp_delay_row):floor(sp_dopp_col)+3);
+        if (floor(sp_delay_row1) < 38) && (floor(sp_delay_row1) > 0) && ...
+                (floor(sp_dopp_col1) < 5) && (floor(sp_dopp_col1) > 1)
+            brcs_ddma = brcs(floor(sp_dopp_col1)-1:floor(sp_dopp_col1)+1, ...
+                            floor(sp_delay_row1):floor(sp_dopp_col1)+3);
             det = find(brcs_ddma<0, 1);
             if ~isempty(det)
                 quality_flag1_1(17) = 1;
