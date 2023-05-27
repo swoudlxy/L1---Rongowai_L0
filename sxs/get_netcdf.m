@@ -3,7 +3,7 @@ function sample_info = get_netcdf(L1_netCDF_name,L1_dict_name,L1_postCal)
 L1_dict = readtable(L1_dict_name);
 L1_dict = string(table2cell(L1_dict));
 
-L1_postCal = rmfield(L1_postCal,'A_eff_all');
+%L1_postCal = rmfield(L1_postCal,'A_eff_all');
 field_names = fieldnames(L1_postCal);
 %field_names(117) = [];                  % debug only
 
@@ -11,7 +11,7 @@ L = length(field_names);
 
 ncid = netcdf.create(L1_netCDF_name,'NETCDF4');
 
-for l = 1:L
+for l = 1:23
 
     field_name1 = string(field_names(l));
     index1 = strcmp(L1_dict(:,1),field_name1);

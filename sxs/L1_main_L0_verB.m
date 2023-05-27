@@ -3,7 +3,7 @@ clear
 clc
 
 % load L0 data
-L0_path = '../dat/raw/Week3_Nov/';
+L0_path = '../dat/raw/';
 L0_filenames = dir([L0_path '*.nc']);
 
 L = length(L0_filenames);
@@ -94,12 +94,12 @@ RHCP_pattern.RHCP = RHCP_R_gain_db_i;
 phy_ele_size = readmatrix('../dat/dem/phy_ele_size.dat');
 
 % L1 dictionary name
-L1_dict_name = '../dat/L1_Dict/L1_Dict_v1_2_1.xlsx';
+L1_dict_name = '../dat/L1_Dict/L1_Dict_v2.xlsx';
 
 %% get post-calibrated L1 product
 clc
 
-for l = 1:L
+for l = 2%1:L
 
     filename = L0_filenames(l).name;
     path = L0_filenames(l).folder;
