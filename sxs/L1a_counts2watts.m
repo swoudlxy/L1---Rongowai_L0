@@ -45,6 +45,6 @@ ddm_power_dbm = zeros(size(ddm_counts_db));
 
 % evaluate ddm power in dBm
 ddm_power_dbm(:) = interp1(ddm_counts_db_ch,ddm_power_dbm_ch,ddm_counts_db(:),'spline');
-ddm_power_dbm = ddm_power_dbm+std_dev_db_ch-binning_thres_db_ch;%+cable_loss_db_ch;
+ddm_power_dbm = ddm_power_dbm+std_dev_db_ch-binning_thres_db_ch;    % cable loss to be compensated when computing BRCS
 
-ddm_power_watts = db2pow(ddm_power_dbm-30);         % convert to watts
+ddm_power_watts = db2pow(ddm_power_dbm-30-9);                       % convert to watts, 9 dB difference from L1a
