@@ -963,7 +963,7 @@ for i = 1:I
 
         tx_pos_xyz1 = [tx_pos_x(j,i) tx_pos_y(j,i) tx_pos_z(j,i)];
         tx_vel_xyz1 = [tx_vel_x(j,i) tx_vel_y(j,i) tx_vel_z(j,i)];
-        
+
         sx_pos_xyz1 = [sx_pos_x(j,i) sx_pos_y(j,i) sx_pos_z(j,i)];
 
         counts_LHCP1 = ddm_power_counts(:,:,j,i);
@@ -1346,7 +1346,7 @@ for i = 1:I
 
         % evaluate effective scattering area and NBRCS
         if sp_delay_row1<=30 && sp_delay_row1>10 && ...
-            sp_doppler_col1<=5 && sp_doppler_col1>=1      % secure the SP is within DDM range
+            sp_doppler_col1<=4 && sp_doppler_col1>=2      % secure the SP is within DDM range
 
             A_eff1 = get_ddm_Aeff4(rx_alt_corrected1,inc_angle1,az_angle1, ...
                 sp_delay_row1,sp_doppler_col1,chi2,A_phy_LUT_all);
