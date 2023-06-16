@@ -957,10 +957,13 @@ zenith_code_phase = zeros(J,I)+invalid;
 for i = 1:I
 
     rx_pos_xyz1 = rx_pos_xyz(i,:);
+    rx_vel_xyz1 = rx_vel_xyz(i,:);
 
     for j = 1:J/2
 
         tx_pos_xyz1 = [tx_pos_x(j,i) tx_pos_y(j,i) tx_pos_z(j,i)];
+        tx_vel_xyz1 = [tx_vel_x(j,i) tx_vel_y(j,i) tx_vel_z(j,i)];
+        
         sx_pos_xyz1 = [sx_pos_x(j,i) sx_pos_y(j,i) sx_pos_z(j,i)];
 
         counts_LHCP1 = ddm_power_counts(:,:,j,i);
