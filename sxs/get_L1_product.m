@@ -5,7 +5,7 @@ function L1_postCal = get_L1_product(   L0_filename, ...
                                         L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm, ...
                                         dem,dtu10,landmask_nz,lcv_mask,water_mask, ...
                                         SV_PRN_LUT,SV_eirp_LUT,LHCP_pattern,RHCP_pattern, ...
-                                        phy_ele_size)
+                                        A_phy_LUT_all)
 
 % Prelaunch 1: Load L0 data and filter invalid values
 
@@ -367,10 +367,11 @@ L1_postCal.dem_source = 'SRTM30-200m';
 
 % write algorithm and LUT versions
 % version numbers may change
-L1_postCal.l1_algorithm_version = '1.1';
-L1_postCal.l1_data_version = '1.12';
+L1_postCal.l1_algorithm_version = '2.0';
+L1_postCal.l1_data_version = '2.0';
 L1_postCal.l1a_sig_LUT_version = '1';
 L1_postCal.l1a_noise_LUT_version = '1';
+L1_postCal.A_LUT_version = '1';                
 L1_postCal.ngrx_port_mapping_version = '1';
 L1_postCal.nadir_ant_data_version = '1';
 L1_postCal.zenith_ant_data_version = '1';
@@ -384,12 +385,11 @@ L1_postCal.per_bin_ant_version = '1';
 % write timestamps and ac-related variables
 L1_postCal.pvt_timestamp_gps_week = pvt_gps_week;
 L1_postCal.pvt_timestamp_gps_sec = pvt_gps_sec;
-L1_postCal.pvt_timestamp_utc = pvt_timestamp_utc;       % algorithm version 1.1
+L1_postCal.pvt_timestamp_utc = pvt_timestamp_utc; 
 
 L1_postCal.ddm_timestamp_gps_week = gps_week;
 L1_postCal.ddm_timestamp_gps_sec = gps_tow;
-L1_postCal.ddm_timestamp_utc = ddm_timestamp_utc;       % algorithm version 1.1
-
+L1_postCal.ddm_timestamp_utc = ddm_timestamp_utc;    
 L1_postCal.ddm_pvt_bias = ddm_pvt_bias;
 
 % 0-indexed sample and DDM
@@ -947,8 +947,10 @@ peak_delay_row = zeros(J,I)+invalid;
 peak_doppler_col = zeros(J,I)+invalid;
 
 sp_delay_row = zeros(J,I)+invalid;
-
 sp_delay_error = zeros(J,I)+invalid;
+
+sp_doppler_col = zeros(J,I)+invalid;
+sp_doppler_error = zeros(J,I)+invalid;
 
 zenith_code_phase = zeros(J,I)+invalid;
 
@@ -992,14 +994,27 @@ for i = 1:I
             d_delay_bin1 = d_delay_chips1/delay_bin_res;
             
             sp_delay_row1 = center_delay_bin-d_delay_bin1;
+
+            % SP doppler value
+            [~,sp_doppler_hz1,~] = deldop(tx_pos_xyz1,rx_pos_xyz1, ...
+                tx_vel_xyz1,rx_vel_xyz1,sx_pos_xyz1);
+
+            doppler_center_hz1 = doppler_center_hz(j,i);
+
+            d_doppler_hz1 = doppler_center_hz1-sp_doppler_hz1+250;
+            d_doppler_bin1 = d_doppler_hz1/doppler_bin_res;
+
+            sp_doppler_col1 = center_doppler_bin-d_doppler_bin1;
             
             % SP delay and doppler location            
             peak_delay_row(j,i) = peak_delay_row1-1;        % correct to 0-based index
             peak_doppler_col(j,i) = peak_doppler_col1-1;
 
             sp_delay_row(j,i) = sp_delay_row1;
-
             sp_delay_error(j,i) = d_delay_chips1;
+
+            sp_doppler_col(j,i) = sp_doppler_col1;
+            sp_doppler_error(j,i) = d_doppler_hz1;
 
         end
 
@@ -1013,7 +1028,7 @@ peak_delay_row(J/2+1:J,:) = peak_delay_row(1:J/2,:);
 peak_doppler_col(J/2+1:J,:) = peak_doppler_col(1:J/2,:);
 
 sp_delay_row(J/2+1:J,:) = sp_delay_row(1:J/2,:);
-sp_doppler_col = peak_doppler_col;
+sp_doppler_col(J/2+1:J,:) = sp_doppler_col(1:J/2,:);
 
 % save variables
 L1_postCal.brcs_ddm_peak_bin_delay_row = peak_delay_row;
@@ -1023,6 +1038,7 @@ L1_postCal.brcs_ddm_sp_bin_delay_row = sp_delay_row;
 L1_postCal.brcs_ddm_sp_bin_dopp_col = sp_doppler_col;
 
 L1_postCal.sp_delay_error = sp_delay_error;
+L1_postCal.sp_dopp_error = sp_doppler_error;
 
 L1_postCal.zenith_code_phase = zenith_code_phase;
 
@@ -1081,10 +1097,11 @@ for j = 1:J/2
         counts_LHCP1 = ddm_power_counts(:,:,j,i);
         counts_RHCP1 = ddm_power_counts(:,:,j+J/2,i);
 
-        sp_delay_row1 = ceil(sp_delay_row_LHCP(j,i))+1;
-        sp_doppler_col1 = sp_doppler_col(j,i)+1;
+        sp_delay_row1 = floor(sp_delay_row_LHCP(j,i))+1;
+        sp_doppler_col1 = floor(sp_doppler_col(j,i))+1;
 
-        if sp_delay_row1<=40 && sp_delay_row1>0
+        if sp_delay_row1<=40 && sp_delay_row1>0 && ...
+                sp_doppler_col1<=5 && sp_doppler_col1>0
 
             sp_counts_LHCP1 = counts_LHCP1(sp_doppler_col1,sp_delay_row1);
             sp_counts_RHCP1 = counts_RHCP1(sp_doppler_col1,sp_delay_row1);
@@ -1138,31 +1155,18 @@ L1_postCal.snr_flag = snr_flag;
 % Part 3B ends
 
 % Part 3C: confidence flag of the SP solved
-sp_dopp_error = zeros(J,I)+invalid;
 confidence_flag = zeros(J,I)+invalid;
 
 for j = 1:J/2
     for i = 1:I
 
-        tx_pos_xyz1 = [tx_pos_x(j,i) tx_pos_y(j,i) tx_pos_z(j,i)];
-        tx_vel_xyz1 = [tx_vel_x(j,i) tx_vel_y(j,i) tx_vel_z(j,i)];
-
-        rx_pos_xyz1 = rx_pos_xyz(i,:);
-        rx_vel_xyz1 = rx_vel_xyz(i,:);
-
-        sx_pos_xyz1 = [sx_pos_x(j,i) sx_pos_y(j,i) sx_pos_z(j,i)];
-
         sx_delay_error1 = abs(sp_delay_error(j,i));
+        sx_doppler_error1 = abs(sp_doppler_error(j,i));
         sx_d_snell_angle1 = abs(sx_d_snell_angle(j,i));
 
         snr_LHCP1 = snr_LHCP_db(j,i);
-        doppler_center1 = doppler_center_hz(j,i);
 
         if ~isnan(tx_pos_x(j,i))
-
-            % doppler of SP
-            [~,sx_doppler_hz1,~] = deldop(tx_pos_xyz1,rx_pos_xyz1,tx_vel_xyz1,rx_vel_xyz1,sx_pos_xyz1);
-            sx_doppler_error1 = doppler_center1-sx_doppler_hz1;
     
             % criteria may change at a later stage
             delay_doppler_snell1 = (sx_delay_error1<1.25) && (abs(sx_doppler_error1)<250) && (sx_d_snell_angle1<2);
@@ -1180,7 +1184,6 @@ for j = 1:J/2
             end
 
             confidence_flag(j,i) = confidence_flag1;
-            sp_dopp_error(j,i) = sx_doppler_error1;
 
         end
 
@@ -1189,13 +1192,11 @@ end
 
 % expand to RHCP channels
 confidence_flag(J/2+1:J,:) = confidence_flag(1:J/2,:);
-sp_dopp_error(J/2+1:J,:) = sp_dopp_error(1:J/2,:);
 
 L1_postCal.confidence_flag = confidence_flag;
-L1_postCal.sp_dopp_error = sp_dopp_error;
 
 L1_postCal.sp_ngrx_delay_correction = sp_delay_error;
-L1_postCal.sp_ngrx_dopp_correction = sp_dopp_error;
+L1_postCal.sp_ngrx_dopp_correction = sp_doppler_error;
 
 % Part 5: Copol and xpol BRCS, reflectivity, peak reflectivity
 
@@ -1242,12 +1243,13 @@ for i = 1:I
                 gps_eirp1,rx_gain_dbi_1,R_tsx1,R_rsx1);
 
             % reflectivity at SP
-            delay_row1 = floor(sp_delay_row(j,i))+1;
-            doppler_col1 = sp_doppler_col(j,i)+1;
+            sp_delay_row1 = floor(sp_delay_row(j,i))+1;
+            sp_doppler_col1 = floor(sp_doppler_col(j,i))+1;
 
-            if delay_row1<=40 && delay_row1>0      % ensure sp within DDM range
-                sp_refl_copol1 = refl_copol1(doppler_col1,delay_row1);
-                sp_refl_xpol1 = refl_xpol1(doppler_col1,delay_row1);
+            if sp_delay_row1<=40 && sp_delay_row1>0 && ...
+                    sp_doppler_col1<=5 && sp_doppler_col1>0
+                sp_refl_copol1 = refl_copol1(sp_doppler_col1,sp_delay_row1);
+                sp_refl_xpol1 = refl_xpol1(sp_doppler_col1,sp_delay_row1);
 
             else
                 sp_refl_copol1 = nan;
@@ -1309,19 +1311,25 @@ chi2 = get_chi2(N,M,center_delay_bin+1,center_doppler_bin+1, ...
 
 for i = 1:I
 
-    rx_pos_xyz1 = rx_pos_xyz(i,:);  rx1.rx_pos_xyz = rx_pos_xyz1;
     rx_vel_xyz1 = rx_vel_xyz(i,:);  rx1.rx_vel_xyz = rx_vel_xyz1;
+    rx_alt1 = rx_pos_lla(i,3);
 
     for j = 1:J/2
 
-        tx_pos_xyz1 = [tx_pos_x(j,i) tx_pos_y(j,i) tx_pos_z(j,i)];
         tx_vel_xyz1 = [tx_vel_x(j,i) tx_vel_y(j,i) tx_vel_z(j,i)];
 
-        tx1.tx_pos_xyz = tx_pos_xyz1;
-        tx1.tx_vel_xyz = tx_vel_xyz1;
+        % azimuth angle between TX and RX velocity
+        unit_rx_vel1 = rx_vel_xyz1/norm(rx_vel_xyz1);
+        unit_tx_vel1 = tx_vel_xyz1/norm(tx_vel_xyz1);
+
+        az_angle1 = acosd(dot(unit_rx_vel1,unit_tx_vel1));      % 1st input of A_eff
         
         sx_pos_xyz1 = [sx_pos_x(j,i) sx_pos_y(j,i) sx_pos_z(j,i)];
         sx_lla1 = ecef2lla(sx_pos_xyz1);
+
+        rx_alt_corrected1 = rx_alt1-sx_lla1(3);                 % 2nd input of A_eff
+
+        inc_angle1 = sx_inc_angle(j,i);                         % 3rd input of A_eff
         
         brcs_copol1 = brcs_copol(:,:,j,i);
         brcs_xpol1 = brcs_xpol(:,:,j,i);
@@ -1330,46 +1338,44 @@ for i = 1:I
         snr_LHCP1 = ddm_snr(j,i);
         
         % evaluate delay and Doppler bin location at SP
-        delay_row1 = sp_delay_row(j,i);
-        doppler_col1 = sp_doppler_col(j,i);
-
-        sx1.sx_pos_xyz = sx_pos_xyz1;
-        sx1.sx_delay_bin = delay_row1;
-        sx1.sx_doppler_bin = doppler_col1;
+        sp_delay_row1 = sp_delay_row(j,i)+1;
+        sp_doppler_col1 = sp_doppler_col(j,i)+1;
 
         % evaluate effective scattering area and NBRCS
-        if delay_row1<=39 && delay_row1>=1 && ...
-            doppler_col1<=4 && doppler_col1>= 0      % secure the SP is within DDM range
+        if sp_delay_row1<=30 && sp_delay_row1>10 && ...
+            sp_doppler_col1<=5 && sp_doppler_col1>=1      % secure the SP is within DDM range
 
-            % local DEM
-            dist_to_coast1 = dist_to_coast_km(j,i);
-        
-            L = 12200; grid_res = 200; %num_grids = L/grid_res;
-            local_dem1 = get_local_dem(sx_lla1,L,grid_res,dem,dtu10,dist_to_coast1);
-
-            % effective scattering area A_eff
-            [A_eff1,~,~] = get_ddm_Aeff3(tx1,rx1,sx1,delay_bin_res,doppler_bin_res, ...
-                local_dem1,phy_ele_size,chi2);
+            A_eff1 = get_ddm_Aeff4(rx_alt_corrected1,inc_angle1,az_angle1, ...
+                sp_delay_row1,sp_doppler_col1,chi2,A_phy_LUT_all);
 
             % derive NBRCS - single theoretical SP bin
-            delay_intg1 = floor(delay_row1)+1;
-            delay_frac1 = delay_row1-floor(delay_row1);
+            delay_intg1 = floor(sp_delay_row1)+1;
+            delay_frac1 = sp_delay_row1-floor(sp_delay_row1);
 
-            brcs_copol_ddma1 = delay_frac1*brcs_copol1(doppler_col1+1,delay_intg1)+ ...
-                               (1-delay_frac1)*brcs_copol1(doppler_col1+1,delay_intg1-1);
+            doppler_intg1 = floor(sp_doppler_col1)+1;
+            doppler_frac1 = sp_doppler_col1-floor(sp_doppler_col1);
 
-            brcs_xpol_ddma1  = delay_frac1*brcs_xpol1(doppler_col1+1,delay_intg1)+ ...
-                               (1-delay_frac1)*brcs_xpol1(doppler_col1+1,delay_intg1-1);
-            
-            A_eff_ddma1      = delay_frac1*A_eff1(doppler_col1+1,delay_intg1)+ ...
-                               (1-delay_frac1)*A_eff1(doppler_col1+1,delay_intg1-1);
+            brcs_copol_ddma1 = (1-doppler_frac1)*(1-delay_frac1)*brcs_copol1(doppler_intg1,delay_intg1)+ ...
+                               (1-doppler_frac1)*delay_frac1*brcs_copol1(doppler_intg1,delay_intg1+1)+ ...
+                               doppler_frac1*(1-delay_frac1)*brcs_copol1(doppler_intg1+1,delay_intg1)+ ...
+                               doppler_frac1*delay_frac1*brcs_copol1(doppler_intg1+1,delay_intg1+1);
+
+            brcs_xpol_ddma1  = (1-doppler_frac1)*(1-delay_frac1)*brcs_xpol1(doppler_intg1,delay_intg1)+ ...
+                               (1-doppler_frac1)*delay_frac1*brcs_xpol1(doppler_intg1,delay_intg1+1)+ ...
+                               doppler_frac1*(1-delay_frac1)*brcs_xpol1(doppler_intg1+1,delay_intg1)+ ...
+                               doppler_frac1*delay_frac1*brcs_xpol1(doppler_intg1+1,delay_intg1+1);
+
+            A_eff_ddma1      = (1-doppler_frac1)*(1-delay_frac1)*A_eff1(doppler_intg1,delay_intg1)+ ...
+                               (1-doppler_frac1)*delay_frac1*A_eff1(doppler_intg1,delay_intg1+1)+ ...
+                               doppler_frac1*(1-delay_frac1)*A_eff1(doppler_intg1+1,delay_intg1)+ ...
+                               doppler_frac1*delay_frac1*A_eff1(doppler_intg1+1,delay_intg1+1);
 
             nbrcs_copol1 = brcs_copol_ddma1/A_eff_ddma1;
             nbrcs_xpol1 = brcs_xpol_ddma1/A_eff_ddma1;            
 
             % coherent reflection
             [CR1,CS1] = coh_det(counts_LHCP1,snr_LHCP1);
-
+            
             A_eff(:,:,j,i) = A_eff1;
             nbrcs_scatter_area(j,i) = A_eff_ddma1;
 
@@ -1467,7 +1473,7 @@ quality_flags1 = zeros(J,I)+invalid;
 for i = 1:I
     for j = 1:J
 
-        quality_flag1_1 = zeros(1,24);
+        quality_flag1_1 = zeros(1,25);
 
         % flag 2, 3 and 23
         rx_roll1 = rx_roll(i);
@@ -1601,6 +1607,14 @@ for i = 1:I
             quality_flag1_1(24) = 1;
         end
 
+        % flag 25
+        rx_vel_xyz1 = rx_vel_xyz(i,:);
+        rx_speed1 = norm(rx_vel_xyz1);
+
+        if rx_speed1>150
+            quality_flag1_1(25) = 1;
+        end
+
         % flag 1
         if (quality_flag1_1(3) == 1 || ...
             quality_flag1_1(4) == 1 || ...
@@ -1619,7 +1633,8 @@ for i = 1:I
             quality_flag1_1(20) == 1 || ...
             quality_flag1_1(22) == 1 || ...
             quality_flag1_1(23) == 1 || ...
-            quality_flag1_1(24) == 1)
+            quality_flag1_1(24) == 1 || ...
+            quality_flag1_1(25) == 1)
         
             quality_flag1_1(1) = 1;
 

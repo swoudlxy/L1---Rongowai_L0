@@ -90,8 +90,9 @@ LHCP_pattern.RHCP = LHCP_R_gain_db_i;
 RHCP_pattern.LHCP = RHCP_L_gain_db_i;
 RHCP_pattern.RHCP = RHCP_R_gain_db_i;
 
-% physical element size LUT
-phy_ele_size = readmatrix('../dat/dem/phy_ele_size.dat');
+% scattering area LUT
+A_phy_LUT_path = '../dat/A_phy_LUT/';
+A_phy_LUT_all = get_A_phy_LUT(A_phy_LUT_path);
 
 % L1 dictionary name
 L1_dict_name = '../dat/L1_Dict/L1_Dict_v2.xlsx';
@@ -111,7 +112,7 @@ for l = 2%1:L
                                 dem,dtu10,landmask_nz,lcv_mask,water_mask, ...
                                 SV_PRN_LUT,SV_eirp_LUT, ...
                                 LHCP_pattern,RHCP_pattern, ...
-                                phy_ele_size);
+                                A_phy_LUT_all);
 
     % the below saves solved L1 products as a MATLAB structure, not necessary for daily processing  
     save(['../out/L1_postCalData/' filename(1:end-3) '_L1.mat'],'L1_postCal','-v7.3');
