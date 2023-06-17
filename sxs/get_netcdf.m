@@ -3,9 +3,7 @@ function sample_info = get_netcdf(L1_netCDF_name,L1_dict_name,L1_postCal)
 L1_dict = readtable(L1_dict_name);
 L1_dict = string(table2cell(L1_dict));
 
-%L1_postCal = rmfield(L1_postCal,'A_eff_all');
 field_names = fieldnames(L1_postCal);
-%field_names(117) = [];                  % debug only
 
 L = length(field_names);
 
@@ -36,7 +34,7 @@ num_ddm = 20;
 delay = 40;
 doppler = 5;
 
-for l = 1:30
+for l = 1:31
 
     field_name1 = string(field_names(l));
     val_value = getfield(L1_postCal,field_name1);
@@ -76,7 +74,7 @@ nccreate(L1_netCDF_name,'sample_index', ...
          'FillValue','disable');
 ncwrite(L1_netCDF_name,'sample_index',sample_value);
 
-for l = 32:L
+for l = 33:L
 
     field_name1 = string(field_names(l));
     val_value = getfield(L1_postCal,field_name1);

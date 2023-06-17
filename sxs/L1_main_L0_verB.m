@@ -91,8 +91,8 @@ RHCP_pattern.LHCP = RHCP_L_gain_db_i;
 RHCP_pattern.RHCP = RHCP_R_gain_db_i;
 
 % scattering area LUT
-A_phy_LUT_path = '../dat/A_phy_LUT/';
-A_phy_LUT_all = get_A_phy_LUT(A_phy_LUT_path);
+A_phy_LUT_path = '../dat/A_phy_LUT/A_phy_LUT.dat';
+[rx_alt_bins,inc_angle_bins,az_angle_bins,A_phy_LUT_all] = get_A_phy_LUT(A_phy_LUT_path);
 
 % L1 dictionary name
 L1_dict_name = '../dat/L1_Dict/L1_Dict_v2.xlsx';
@@ -112,8 +112,8 @@ for l = 2%1:L
                                 dem,dtu10,landmask_nz,lcv_mask,water_mask, ...
                                 SV_PRN_LUT,SV_eirp_LUT, ...
                                 LHCP_pattern,RHCP_pattern, ...
-                                A_phy_LUT_all);
-%{
+                                rx_alt_bins,inc_angle_bins,az_angle_bins,A_phy_LUT_all);
+
     % the below saves solved L1 products as a MATLAB structure, not necessary for daily processing  
     save(['../out/L1_postCalData/' filename(1:end-3) '_L1.mat'],'L1_postCal','-v7.3');
 
@@ -122,5 +122,5 @@ for l = 2%1:L
     sample_info = get_netcdf(L1_netCDF,L1_dict_name,L1_postCal);
     
     disp(l);    % display the number of files being processed
-%}
+
 end

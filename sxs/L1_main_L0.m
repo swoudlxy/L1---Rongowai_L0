@@ -14,7 +14,7 @@ clc
 
 % load L0 netCDF
 path1 = '../dat/raw/';
-L0_filename = [path1 '20230102-140740_NZCH-NZNV.nc'];
+L0_filename = [path1 '20230308-103417_NZWN-NZTG.nc'];
 
 % PVT GPS week and sec
 pvt_gps_week = double(ncread(L0_filename,'/science/GPS_week_of_SC_attitude'));
@@ -95,7 +95,29 @@ rx_yaw_pvt = rx_yaw_pvt(index1);
 rx_clk_bias_m_pvt = rx_clk_bias_m_pvt(index1);
 rx_clk_drift_mps_pvt = rx_clk_drift_mps_pvt(index1);
 
-% identify and compensate the value equal to 0 (randomly happens)
+% remove first and last few zeros
+index0_b = find(pvt_gps_week>0,1);
+index0_e = find(pvt_gps_week>0,1,'last');
+
+pvt_gps_week = pvt_gps_week(index0_b:index0_e);
+pvt_gps_sec = pvt_gps_sec(index0_b:index0_e);
+
+rx_pos_x_pvt = rx_pos_x_pvt(index0_b:index0_e);
+rx_pos_y_pvt = rx_pos_y_pvt(index0_b:index0_e);
+rx_pos_z_pvt = rx_pos_z_pvt(index0_b:index0_e);
+
+rx_vel_x_pvt = rx_vel_x_pvt(index0_b:index0_e);
+rx_vel_y_pvt = rx_vel_y_pvt(index0_b:index0_e);
+rx_vel_z_pvt = rx_vel_z_pvt(index0_b:index0_e);
+
+rx_roll_pvt = rx_roll_pvt(index0_b:index0_e);
+rx_pitch_pvt = rx_pitch_pvt(index0_b:index0_e);
+rx_yaw_pvt = rx_yaw_pvt(index0_b:index0_e);
+
+rx_clk_bias_m_pvt = rx_clk_bias_m_pvt(index0_b:index0_e);
+rx_clk_drift_mps_pvt = rx_clk_drift_mps_pvt(index0_b:index0_e);
+
+% identify and compensate the value equal to 0 in the middle of data (randomly happens)
 index0 = find(pvt_gps_week==0);
 if ~isempty(index0)
     L = length(index0);
@@ -407,18 +429,24 @@ minutes = floor((time_duration-hours*3600)/60);
 seconds = time_duration-hours*3600-minutes*60;
 time_coverage_duration = ['P0DT' num2str(hours) 'H' num2str(minutes) 'M' num2str(seconds) 'S'];
 
+% all timestamps refer to the 1st DDM sample
+ref_timestamp_utc = ddm_utc(1);
+
+pvt_timestamp_utc = pvt_utc-ref_timestamp_utc;
+ddm_timestamp_utc = ddm_utc-ref_timestamp_utc;
+
 L1_postCal.time_coverage_duration = time_coverage_duration;
 
-L1_postCal.aircraft_reg = 'ZK-NFA';             % default value
-L1_postCal.ddm_source = 2;                      % 1 = GPS signal simulator, 2 = aircraft
-L1_postCal.ddm_time_type_selector = 1;          % 1 = middle of DDM sampling period
-L1_postCal.delay_resolution = 0.25;             % unit in chips
-L1_postCal.dopp_resolution = 500;               % unit in Hz
+L1_postCal.aircraft_reg = 'ZK-NFA';                 % default value
+L1_postCal.ddm_source = 2;                          % 1 = GPS signal simulator, default 2 = aircraft
+L1_postCal.ddm_time_type_selector = 1;              % 1 = middle of DDM sampling period
+L1_postCal.delay_resolution = delay_bin_res;        % unit in chips
+L1_postCal.dopp_resolution = delay_doppler_res;     % unit in Hz
 L1_postCal.dem_source = 'SRTM30';
 
 % write algorithm and LUT versions
 L1_postCal.l1_algorithm_version = '1.1';
-L1_postCal.l1_data_version = '1';
+L1_postCal.l1_data_version = '1.12';
 L1_postCal.l1a_sig_LUT_version = '1';
 L1_postCal.l1a_noise_LUT_version = '1';
 L1_postCal.ngrx_port_mapping_version = '1';
@@ -732,7 +760,7 @@ L1_postCal.tx_clk_bias = tx_clk_bias;
 L1_postCal.prn_code = prn_code;
 L1_postCal.sv_num = sv_num;
 L1_postCal.track_id = track_id;
-%}
+
 %% Part 3: L1a calibration
 % this part converts from raw counts to signal power in watts and complete
 % L1a calibration
@@ -935,7 +963,8 @@ gps_tx_power_db_w = zeros(J,I)+invalid;
 gps_ant_gain_db_i = zeros(J,I)+invalid;
 static_gps_eirp = zeros(J,I)+invalid;
 
-sx_rx_gain = zeros(J,I)+invalid;
+sx_rx_gain_copol = zeros(J,I)+invalid;
+sx_rx_gain_xpol = zeros(J,I)+invalid;
 
 for i = 1:I
 
@@ -971,7 +1000,7 @@ for i = 1:I
 
             if LOS_flag1 == 1
                 sx_pos_lla1 = ecef2lla(sx_pos_xyz1);            % <lat,lon,alt> of the specular reflection
-                surface_type1 = get_surf_type(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);
+                surface_type1 = get_surf_type2(sx_pos_xyz1,landmask_nz,water_mask,lcv_mask);
 
                 % only process samples with valid sx positions, i.e., LOS = 1
                 % derive sx velocity
@@ -980,7 +1009,7 @@ for i = 1:I
                 rx_pos_xyz_dt = rx_pos_xyz1+dt*rx_vel_xyz1;
                 [sx_pos_xyz_dt,~,~,~,~] = sp_solver(tx_pos_xyz_dt,rx_pos_xyz_dt,dem,dtu10,landmask_nz);
 
-                sx_vel_xyz1 = sx_pos_xyz_dt-sx_pos_xyz1;            
+                sx_vel_xyz1 = (sx_pos_xyz_dt-sx_pos_xyz1)/dt;            
 
                 % save sx values to variables
                 sx_pos_x(j,i) = sx_pos_xyz1(1);
@@ -1035,8 +1064,13 @@ for i = 1:I
                 gps_ant_gain_db_i(j,i) = gps_rad1(2);
                 static_gps_eirp(j,i) = gps_rad1(3);
 
-                sx_rx_gain(j,i) = sx_rx_gain_LHCP1(1);      % LHCP channel rx gain
-                sx_rx_gain(j+J/2,i) = sx_rx_gain_RHCP1(2);  % RHCP channel rx gain
+                % copol gain
+                sx_rx_gain_copol(j,i) = sx_rx_gain_LHCP1(1);      % LHCP channel rx gain
+                sx_rx_gain_copol(j+J/2,i) = sx_rx_gain_RHCP1(2);  % RHCP channel rx gain
+
+                % xpol gain
+                sx_rx_gain_xpol(j,i) = sx_rx_gain_LHCP1(2);       % LHCP channel RHCP rx gain
+                sx_rx_gain_xpol(j+J/2,i) = sx_rx_gain_RHCP1(1);   % RHCP channel LHCP rx gain
                               
             end
         end
@@ -1108,7 +1142,8 @@ L1_postCal.sp_az_body = sx_az_body;
 L1_postCal.sp_theta_enu = sx_theta_enu;
 L1_postCal.sp_az_enu = sx_az_enu;
 
-L1_postCal.sp_rx_gain = sx_rx_gain;
+L1_postCal.sp_rx_gain_copol = sx_rx_gain_copol;
+L1_postCal.sp_rx_gain_xpol = sx_rx_gain_xpol;
 
 L1_postCal.gps_off_boresight_angle_deg = gps_boresight;
 
@@ -1297,7 +1332,7 @@ for i = 1:I
         dist_to_coast1 = dist_to_coast_km(j,i);
 
         eirp_watt1 = static_gps_eirp(j,i);
-        rx_gain_db_i1 = sx_rx_gain(j,i);
+        rx_gain_db_i1 = sx_rx_gain_copol(j,i);
         TSx1 = tx_to_sp_range(j,i);
         RSx1 = rx_to_sp_range(j,i);
         
@@ -1571,7 +1606,7 @@ for i = 1:I
         end
 
         % flag 20
-        rx_gain1 = sx_rx_gain(j,i);
+        rx_gain1 = sx_rx_gain_copol(j,i);
         if (rx_gain1 == invalid) && (~isnan(prn_code1))
             quality_flag1_1(20) = 1;
         end
