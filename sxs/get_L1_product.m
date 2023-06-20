@@ -1,5 +1,6 @@
 % This function solves all L1 variables and packets as a structure for
 % processing multiple L0 files
+% version 2.1
 
 function L1_postCal = get_L1_product(   L0_filename, ...
                                         L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm, ...
@@ -367,7 +368,7 @@ L1_postCal.dem_source = 'SRTM30-200m';
 
 % write algorithm and LUT versions
 % version numbers may change
-L1_postCal.l1_algorithm_version = '2.0';
+L1_postCal.l1_algorithm_version = '2.1';
 L1_postCal.l1_data_version = '2.0';
 L1_postCal.l1a_sig_LUT_version = '1';
 L1_postCal.l1a_noise_LUT_version = '1';
@@ -630,8 +631,8 @@ end
 
 % extend to RHCP channels
 tx_pos_x(J/2+1:J,:) = tx_pos_x(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
-tx_pos_y(J/2+1:J,:) = tx_pos_y(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
-tx_pos_z(J/2+1:J,:) = tx_pos_z(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
+tx_pos_y(J/2+1:J,:) = tx_pos_y(1:J/2,:);    tx_vel_y(J/2+1:J,:) = tx_vel_y(1:J/2,:);
+tx_pos_z(J/2+1:J,:) = tx_pos_z(1:J/2,:);    tx_vel_z(J/2+1:J,:) = tx_vel_z(1:J/2,:);
 
 tx_clk_bias(J/2+1:J,:) = tx_clk_bias(1:J/2,:);
 
@@ -1305,8 +1306,8 @@ nbrcs_scatter_area = zeros(J,I)+nan;
 nbrcs_copol = zeros(J/2,I)+nan;
 nbrcs_xpol = zeros(J/2,I)+nan;
 
-coherency_ratio = zeros(J,I)+invalid;
-coherency_state = zeros(J,I)+invalid;
+%coherency_ratio = zeros(J,I)+invalid;
+%coherency_state = zeros(J,I)+invalid;
 
 % 2D ambiguity function
 chi2 = get_chi2(N,M,center_delay_bin+1,center_doppler_bin+1, ...
@@ -1337,15 +1338,15 @@ for i = 1:I
         brcs_copol1 = brcs_copol(:,:,j,i);
         brcs_xpol1 = brcs_xpol(:,:,j,i);
 
-        counts_LHCP1 = ddm_power_counts(:,:,j,i);
-        snr_LHCP1 = ddm_snr(j,i);
+        %counts_LHCP1 = ddm_power_counts(:,:,j,i);
+        %snr_LHCP1 = ddm_snr(j,i);
         
         % evaluate delay and Doppler bin location at SP
         sp_delay_row1 = sp_delay_row(j,i)+1;
         sp_doppler_col1 = sp_doppler_col(j,i)+1;
 
         % evaluate effective scattering area and NBRCS
-        if sp_delay_row1<=40 && sp_delay_row1>=1 && ...
+        if sp_delay_row1<=39 && sp_delay_row1>=1 && ...
             sp_doppler_col1<=5 && sp_doppler_col1>=1 && ...     % secure the SP is within DDM range
             rx_alt_corrected1>=rx_alt_bins(1) && rx_alt_corrected1<=rx_alt_bins(end) && ...
             inc_angle1>=0 && inc_angle1<=80                     % ensure interpolate within reasonable range
@@ -1395,7 +1396,7 @@ for i = 1:I
             nbrcs_xpol1 = brcs_xpol_ddma1/A_eff_ddma1;            
 
             % coherent reflection
-            [CR1,CS1] = coh_det(counts_LHCP1,snr_LHCP1);
+            %[CR1,CS1] = coh_det(counts_LHCP1,snr_LHCP1);
             
             A_eff(:,:,j,i) = A_eff1;
             nbrcs_scatter_area(j,i) = A_eff_ddma1;
@@ -1403,8 +1404,8 @@ for i = 1:I
             nbrcs_copol(j,i) = nbrcs_copol1;
             nbrcs_xpol(j,i) = nbrcs_xpol1;
 
-            coherency_ratio(j,i) = CR1;
-            coherency_state(j,i) = CS1;
+            %coherency_ratio(j,i) = CR1;
+            %coherency_state(j,i) = CS1;
             
         end
 
@@ -1416,18 +1417,101 @@ nbrcs_scatter_area(J/2+1:J,:) = nbrcs_scatter_area(1:J/2,:);
 
 ddm_nbrcs = [nbrcs_copol;nbrcs_xpol];
 
-coherency_ratio(J/2+1:J,:) = coherency_ratio(1:J/2,:);
-coherency_state(J/2+1:J,:) = coherency_state(1:J/2,:);
+%coherency_ratio(J/2+1:J,:) = coherency_ratio(1:J/2,:);
+%coherency_state(J/2+1:J,:) = coherency_state(1:J/2,:);
 
 L1_postCal.A_eff = A_eff;
 L1_postCal.nbrcs_scatter_area = nbrcs_scatter_area;
 
 L1_postCal.ddm_nbrcs = ddm_nbrcs;
 
-L1_postCal.coherency_ratio = coherency_ratio;
-L1_postCal.coherency_state = coherency_state;
+%L1_postCal.coherency_ratio = coherency_ratio;
+%L1_postCal.coherency_state = coherency_state;
 
-% Part 7: fresnel dimensions
+% Part 7: coherence detection
+clc
+
+rmsd_delay_span_chips               = 1.5;  % delay span over which to compute error relative to WAF
+fft_interpolation_factor            = 10;   % used in getRongowaiWAFRMSD for interpolation
+power_vs_delay_noise_floor_rows     = 5;    % use in getRongowaiWAFRMSD power vs delay noise floor estimation
+power_vs_delay_snr_min              = -10;  % minimum power vs delay snr threshold
+aircraft_alt_min                    = 2e3;  % minimum height of aircraft, otherwise coherence state is 'uncertain'
+max_peak_delay_row                  = 30;   % only use power vs delay waveforms where the peak is less than this
+
+ac_alt = rx_pos_lla(:,3);
+
+coherence_metric      = NaN(10,length(ac_alt));
+coherence_state       = NaN(10,length(ac_alt));
+power_vs_delay_snr_db = NaN(10,length(ac_alt));
+peak_delay_row        = NaN(10,length(ac_alt));
+
+for channel = 1:10      % channel-by-channel processing
+
+    altitude  = ac_alt;
+    ddm       = squeeze(ddm_power_counts(:,:,channel,:));     % select one channel at a time
+    index     = 1:1:length(ac_alt);
+
+    % select valid DDMs
+    zeros_check = squeeze(sum(sum(ddm,1),2));           % select valid DDMs
+    idx         = find(zeros_check>0);
+    altitude    = altitude(idx);
+    ddm         = ddm(:,:,idx);
+    index       = index(idx);
+
+    nan_check = squeeze(sum(sum(ddm,1),2));
+    idx         = find(~isnan(nan_check));
+    altitude    = altitude(idx);
+    ddm         = ddm(:,:,idx);
+    index       = index(idx);
+
+    peak_delay_row_index = NaN(size(altitude));
+    for z=1:length(altitude)
+        i                           = index(z);
+        hold_p_vs_delay             = squeeze(ddm(:,:,z));
+        hold_p_vs_delay             = nansum(hold_p_vs_delay,1);
+        [~,m]                       = nanmax(hold_p_vs_delay);
+        peak_delay_row(channel,i)   = m;
+        peak_delay_row_index(z)     = m;
+    end
+
+    idx             = find(peak_delay_row_index<=max_peak_delay_row); % detection not attempted if peak exceeds this limit
+    ddm             = ddm(:,:,idx);
+    index           = index(idx);
+    altitude        = altitude(idx);
+
+    for z=1:length(altitude)
+        i = index(z);
+
+        outputs                             = getRongowaiWAFRMSD(squeeze(ddm(:,:,z)),delay_bin_res, ...
+                                                                 rmsd_delay_span_chips,fft_interpolation_factor, ...
+                                                                 power_vs_delay_noise_floor_rows);
+
+        coherence_metric(channel,i)         = outputs.rmsd;
+        power_vs_delay_snr_db(channel,i)    = outputs.power_vs_delay_snr_db;
+
+        if power_vs_delay_snr_db(channel,i)<power_vs_delay_snr_min || altitude(z)<aircraft_alt_min
+            coherence_state(channel,i) = 5; % Uncertain coherence state
+        elseif coherence_metric(channel,i)<=0.25
+            coherence_state(channel,i) = 1; % With high confidence, state is dominantly coherent
+        elseif coherence_metric(channel,i)>0.25 && coherence_metric(channel,i)<=0.50
+            coherence_state(channel,i) = 2; % State is likely coherent
+        elseif coherence_metric(channel,i)>0.50 && coherence_metric(channel,i)<0.75
+            coherence_state(channel,i) = 3; % State is likely mixed/weakly diffuse
+        elseif coherence_metric(channel,i)>=0.75
+            coherence_state(channel,i) = 4; % With high confidence, state is dominantly incoherent
+        end
+
+    end 
+
+end
+
+coherence_metric(channel+1:channel+10,:) = coherence_metric;
+coherence_state(channel+1:channel+10,:) = coherence_state;
+
+L1_postCal.coherence_metric = coherence_metric;
+L1_postCal.coherence_state = coherence_state;
+
+% Part 8: fresnel dimensions
 fresnel_coeff = zeros(J,I)+invalid;
 fresnel_minor = zeros(J,I)+invalid;
 fresnel_major = zeros(J,I)+invalid;
