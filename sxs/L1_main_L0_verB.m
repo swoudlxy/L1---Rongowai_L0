@@ -14,8 +14,8 @@ clc
 % load L1a calibration tables
 L1a_path = '../dat/L1a_cal/';
 
-L1a_cal_ddm_counts_db = readmatrix([L1a_path 'L1A_cal_ddm_counts_dB.dat']);
-L1a_cal_ddm_power_dbm = readmatrix([L1a_path 'L1A_cal_ddm_power_dBm.dat']);
+L1a_cal_ddm_counts_db = readmatrix([L1a_path 'L1A_cal_ddm_counts_dB_v1.dat']);  % version control - 28 June
+L1a_cal_ddm_power_dbm = readmatrix([L1a_path 'L1A_cal_ddm_power_dBm_v1.dat']);
 
 % load SRTM DEM
 dem_path = '../dat/dem/';
@@ -72,13 +72,14 @@ SV_PRN_LUT = SV_PRN_LUT(:,1:2);
 SV_eirp_LUT = readmatrix([gps_path SV_eirp_filename]);
 
 % load and process nadir NGRx-GNSS antenna patterns
+% update antenna pattern LUT - 28 June
 rng_path = '../dat/rng/';
 
-LHCP_L_filename = 'GNSS_LHCP_L_gain_db_i_v1.dat';
-LHCP_R_filename = 'GNSS_LHCP_R_gain_db_i_v1.dat';
+LHCP_L_filename = 'GNSS_LHCP_L_gain_db_i_v2.dat';
+LHCP_R_filename = 'GNSS_LHCP_R_gain_db_i_v2.dat';
 
-RHCP_L_filename = 'GNSS_RHCP_L_gain_db_i_v1.dat';
-RHCP_R_filename = 'GNSS_RHCP_R_gain_db_i_v1.dat';
+RHCP_L_filename = 'GNSS_RHCP_L_gain_db_i_v2.dat';
+RHCP_R_filename = 'GNSS_RHCP_R_gain_db_i_v2.dat';
 
 [~,~,LHCP_L_gain_db_i] = get_ant_pattern([rng_path,LHCP_L_filename]);
 [~,~,LHCP_R_gain_db_i] = get_ant_pattern([rng_path,LHCP_R_filename]);
@@ -91,16 +92,44 @@ RHCP_pattern.LHCP = RHCP_L_gain_db_i;
 RHCP_pattern.RHCP = RHCP_R_gain_db_i;
 
 % scattering area LUT
-A_phy_LUT_path = '../dat/A_phy_LUT/A_phy_LUT.dat';
-[rx_alt_bins,inc_angle_bins,az_angle_bins,A_phy_LUT_all] = get_A_phy_LUT(A_phy_LUT_path);
+% LUT change - 28 June
+A_phy_LUT_files = dir('../dat/A_phy_LUT/*.dat');
+path = A_phy_LUT_files(1).folder;
+L = length(A_phy_LUT_files);
+
+% read input variables
+[rx_alt_bins,inc_angle_bins,az_angle_bins] = get_A_phy_inputs([path '/' A_phy_LUT_files(12).name]);
+
+num_rx_alt = length(rx_alt_bins);
+num_inc_angle = length(inc_angle_bins);
+num_az_angle = length(az_angle_bins);
+
+A_phy_LUT_all = struct;
+
+for l = 1:L-1
+
+    A_phy_LUT_filename = A_phy_LUT_files(l).name;
+    A_phy_LUT_file = [path '/' A_phy_LUT_filename];
+    A_phy_LUT = get_A_phy_LUT(A_phy_LUT_file,num_rx_alt,num_inc_angle,num_az_angle);
+
+    sp_doppler_frac1 = str2double(A_phy_LUT_filename(11:end-4));
+    sp_doppler_frac_range = -0.5:0.1:0.5;
+
+    % ordering from smallest to largest fraction
+    [~,k] = min(abs(sp_doppler_frac_range-sp_doppler_frac1));
+
+    A_phy_LUT_all(k).sp_doppler_frac = sp_doppler_frac1;
+    A_phy_LUT_all(k).A_phy_LUT = A_phy_LUT;
+
+end
 
 % L1 dictionary name
-L1_dict_name = '../dat/L1_Dict/L1_Dict_v2.xlsx';
+L1_dict_name = '../dat/L1_Dict/L1_Dict_v2_2.xlsx';
 
 %% get post-calibrated L1 product
 clc
 
-for l = 2%1:L
+for l = 2
 
     filename = L0_filenames(l).name;
     path = L0_filenames(l).folder;
@@ -115,7 +144,7 @@ for l = 2%1:L
                                 rx_alt_bins,inc_angle_bins,az_angle_bins,A_phy_LUT_all);
 
     % the below saves solved L1 products as a MATLAB structure, not necessary for daily processing  
-    save(['../out/L1_postCalData/' filename(1:end-3) '_L1.mat'],'L1_postCal','-v7.3');
+    %save(['../out/L1_postCalData/' filename(1:end-3) '_L1.mat'],'L1_postCal','-v7.3');
 
     % the below packets the L1 products as a netCDF
     L1_netCDF = ['../out/L1_netCDFs/' filename(1:end-3) '_L1.nc'];
