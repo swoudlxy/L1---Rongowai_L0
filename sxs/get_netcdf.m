@@ -42,12 +42,13 @@ for l = 1:31
     index1 = strcmp(L1_dict(:,1),field_name1);
     netCDF_field_name = L1_dict(index1,1);
     long_name = L1_dict(index1,2);
+    dtype = L1_dict(index1,3);
     unit = L1_dict(index1,4);
     dimension = L1_dict(index1,5);
     comment = L1_dict(index1,6);
 
     if ~strcmp(unit,'<none>') && strcmp(dimension,'<none>')
-        nccreate(L1_netCDF_name,netCDF_field_name);
+        nccreate(L1_netCDF_name,netCDF_field_name,"Datatype",dtype);
         ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
@@ -57,7 +58,7 @@ for l = 1:31
     elseif strcmp(dimension,'sample')
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'sample',num_sample}, ...
-                 'FillValue','disable');
+                 'FillValue','disable','Datatype',dtype);
         ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
@@ -71,7 +72,7 @@ end
 sample_value = (0:1:num_sample-1)';
 nccreate(L1_netCDF_name,'sample_index', ...
          'Dimensions',{'sample',num_sample}, ...
-         'FillValue','disable');
+         'FillValue','disable','Datatype',dtype);
 ncwrite(L1_netCDF_name,'sample_index',sample_value);
 
 for l = 33:L
@@ -84,6 +85,7 @@ for l = 33:L
 
     long_name = L1_dict(index1,2);
     data_type = L1_dict(index1,3);
+    dtype = L1_dict(index1,3);
     unit = L1_dict(index1,4);
     dimension = L1_dict(index1,5);
     comment = L1_dict(index1,6);
@@ -91,7 +93,7 @@ for l = 33:L
     if strcmp(dimension,'sample')
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'sample',num_sample}, ...
-                 'FillValue','disable');
+                 'FillValue','disable','Datatype',dtype);
         ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
@@ -103,7 +105,7 @@ for l = 33:L
 
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'ddm',num_ddm}, ...
-                 'FillValue','disable');
+                 'FillValue','disable', 'Datatype',dtype);
         ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
@@ -115,7 +117,7 @@ for l = 33:L
 
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'ddm',num_ddm,'sample',num_sample}, ...
-                 'FillValue','disable');
+                 'FillValue','disable','Datatype',dtype);
         ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
@@ -127,7 +129,7 @@ for l = 33:L
 
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'doppler',doppler,'delay',delay,'ddm',num_ddm,'sample',num_sample}, ...
-                 'FillValue','disable');
+                 'FillValue','disable','Datatype',dtype);
         ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
@@ -138,7 +140,7 @@ for l = 33:L
         val_value = cast(val_value,data_type);
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'x',1,'delay',delay,'ddm',num_ddm,'sample',num_sample}, ...
-                 'FillValue','disable');
+                 'FillValue','disable', 'Datatype',dtype);
         ncwrite(L1_netCDF_name,netCDF_field_name,val_value);
 
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'long name',long_name);
