@@ -1,5 +1,7 @@
 % This function solves all L1 variables and packets as a structure for
 % processing multiple L0 files
+% Algorithm version 2.2
+% L1 dictionary version 2.2
 
 function L1_postCal = get_L1_product(   L0_filename, ...
                                         L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm, ...
@@ -367,14 +369,15 @@ L1_postCal.dem_source = 'SRTM30-200m';
 
 % write algorithm and LUT versions
 % version numbers may change
-L1_postCal.l1_algorithm_version = '2.0';
-L1_postCal.l1_data_version = '2.0';
+L1_postCal.l1_algorithm_version = '2.2';        % 27 June, algorithm change
+L1_postCal.l1_data_version = '2.2';             % 28 June, L1 dictionary change
 L1_postCal.l1a_sig_LUT_version = '1';
 L1_postCal.l1a_noise_LUT_version = '1';
-L1_postCal.A_LUT_version = '1';                
+L1_postCal.A_LUT_version = '1.1';               % 27 June               
 L1_postCal.ngrx_port_mapping_version = '1';
 L1_postCal.nadir_ant_data_version = '1';
 L1_postCal.zenith_ant_data_version = '1';
+L1_postCal.nadir_ant_data_version = '2';        % 27 June
 L1_postCal.prn_sv_maps_version = '1';
 L1_postCal.gps_eirp_param_version = '7';
 L1_postCal.land_mask_version = '1';
@@ -629,9 +632,9 @@ end
 %}
 
 % extend to RHCP channels
-tx_pos_x(J/2+1:J,:) = tx_pos_x(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
-tx_pos_y(J/2+1:J,:) = tx_pos_y(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
-tx_pos_z(J/2+1:J,:) = tx_pos_z(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);
+tx_pos_x(J/2+1:J,:) = tx_pos_x(1:J/2,:);    tx_vel_x(J/2+1:J,:) = tx_vel_x(1:J/2,:);        % XYZ error 27-June
+tx_pos_y(J/2+1:J,:) = tx_pos_y(1:J/2,:);    tx_vel_y(J/2+1:J,:) = tx_vel_y(1:J/2,:);
+tx_pos_z(J/2+1:J,:) = tx_pos_z(1:J/2,:);    tx_vel_z(J/2+1:J,:) = tx_vel_z(1:J/2,:);
 
 tx_clk_bias(J/2+1:J,:) = tx_clk_bias(1:J/2,:);
 
@@ -688,6 +691,7 @@ for i = 1:I
             ddm_power_counts1 = raw_counts1*first_scale_factor1;
 
             % perform L1a calibration from Counts to Watts
+            % function update for this step 27-June
             ddm_power_watts1 = L1a_counts2watts(ddm_power_counts1,ANZ_port1, ...
                 L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm,std_dev1);
 
@@ -758,6 +762,9 @@ static_gps_eirp = zeros(J,I)+invalid;
 
 sx_rx_gain_copol = zeros(J,I)+invalid;
 sx_rx_gain_xpol = zeros(J,I)+invalid;
+
+% L1a confidence - 28 June
+L1a_confidence_flag = zeros(J,I)+invalid;
 
 for i = 1:I
 
@@ -836,6 +843,25 @@ for i = 1:I
                 sx_rx_gain_LHCP1 = get_sx_rx_gain(sx_angle_ant1,LHCP_pattern);
                 sx_rx_gain_RHCP1 = get_sx_rx_gain(sx_angle_ant1,RHCP_pattern);
 
+                % determine L1a confidence - 28 June
+                sx_theta_body1 = sx_angle_body1(1);         % off-boresight angle
+
+                % antenna x-pol gain ratio
+                copol_ratio1 = sx_rx_gain_LHCP1(1)-sx_rx_gain_LHCP1(2);
+                xpol_ratio1 = sx_rx_gain_RHCP1(2)-sx_rx_gain_RHCP1(1);
+
+                if sx_theta_body1<=60 && copol_ratio1>=14
+                    L1a_confidence_flag_copol1 = 1;
+                else
+                    L1a_confidence_flag_copol1 = 0;
+                end
+
+                if sx_theta_body1<=60 && xpol_ratio1>=14
+                    L1a_confidence_flag_xpol1 = 1;
+                else
+                    L1a_confidence_flag_xpol1 = 0;
+                end
+
                 % save to variables
                 sx_theta_body(j,i) = sx_angle_body1(1);
                 sx_az_body(j,i) = sx_angle_body1(2);
@@ -859,6 +885,10 @@ for i = 1:I
                 % xpol gain
                 sx_rx_gain_xpol(j,i) = sx_rx_gain_LHCP1(2);       % LHCP channel RHCP rx gain
                 sx_rx_gain_xpol(j+J/2,i) = sx_rx_gain_RHCP1(1);   % RHCP channel LHCP rx gain
+
+                % L1a confidence flag - 28 June
+                L1a_confidence_flag(j,i) = L1a_confidence_flag_copol1;
+                L1a_confidence_flag(j+J/2,i) = L1a_confidence_flag_xpol1;
                                               
             end
         end
@@ -1004,13 +1034,14 @@ for i = 1:I
 
             doppler_center_hz1 = doppler_center_hz(j,i);
 
-            d_doppler_hz1 = doppler_center_hz1-sp_doppler_hz1+250;
+            % Doppler is now centrally binned - 27 June
+            d_doppler_hz1 = doppler_center_hz1-sp_doppler_hz1;
             d_doppler_bin1 = d_doppler_hz1/doppler_bin_res;
 
             sp_doppler_col1 = center_doppler_bin-d_doppler_bin1;
             
             % SP delay and doppler location            
-            peak_delay_row(j,i) = peak_delay_row1-1;        % correct to 0-based index
+            peak_delay_row(j,i) = peak_delay_row1-1;            % correct to 0-based index
             peak_doppler_col(j,i) = peak_doppler_col1-1;
 
             sp_delay_row(j,i) = sp_delay_row1;
@@ -1151,9 +1182,9 @@ noise_floor = [repmat(noise_floor_LHCP,[M,N]);repmat(noise_floor_RHCP,[M,N])];
 ddm_snr = [snr_LHCP_db;snr_RHCP_db];
 snr_flag = [snr_flag_LHCP;snr_flag_RHCP];
 
-L1_postCal.noise_floor = noise_floor;
+L1_postCal.ddm_noise_floor = noise_floor;       % typo - 28 June
 L1_postCal.ddm_snr = ddm_snr;
-L1_postCal.snr_flag = snr_flag;
+L1_postCal.ddm_snr_flag = snr_flag;             % typo - 28 June
 
 % Part 3B ends
 
@@ -1299,14 +1330,18 @@ L1_postCal.norm_refl_waveform = norm_refl_waveform;
 % Part 5 ends
 
 % Part 6: NBRCS and other related parameters
+% significant changes in this section with a few new functions
+% 28 June
 A_eff = zeros(M,N,J,I)+invalid;
-nbrcs_scatter_area = zeros(J,I)+nan;
 
-nbrcs_copol = zeros(J/2,I)+nan;
-nbrcs_xpol = zeros(J/2,I)+nan;
+nbrcs_scatter_area_v1 = zeros(J,I)+nan;
+nbrcs_scatter_area_v2 = zeros(J,I)+nan;
 
-coherency_ratio = zeros(J,I)+invalid;
-coherency_state = zeros(J,I)+invalid;
+nbrcs_copol_v1 = zeros(J/2,I)+nan;
+nbrcs_xpol_v1 = zeros(J/2,I)+nan;
+
+nbrcs_copol_v2 = zeros(J/2,I)+nan;
+nbrcs_xpol_v2 = zeros(J/2,I)+nan;
 
 % 2D ambiguity function
 chi2 = get_chi2(N,M,center_delay_bin+1,center_doppler_bin+1, ...
@@ -1325,7 +1360,7 @@ for i = 1:I
         unit_rx_vel1 = rx_vel_xyz1/norm(rx_vel_xyz1);
         unit_tx_vel1 = tx_vel_xyz1/norm(tx_vel_xyz1);
 
-        az_angle1 = acosd(dot(unit_rx_vel1,unit_tx_vel1));      % 1st input of A_eff
+        az_angle1 = acosd(-1*dot(unit_rx_vel1,unit_tx_vel1));   % 1st input of A_eff
         
         sx_pos_xyz1 = [sx_pos_x(j,i) sx_pos_y(j,i) sx_pos_z(j,i)];
         sx_lla1 = ecef2lla(sx_pos_xyz1);
@@ -1345,89 +1380,145 @@ for i = 1:I
         sp_doppler_col1 = sp_doppler_col(j,i)+1;
 
         % evaluate effective scattering area and NBRCS
-        if sp_delay_row1<=40 && sp_delay_row1>=1 && ...
+        if sp_delay_row1<=39 && sp_delay_row1>=1 && ...
             sp_doppler_col1<=5 && sp_doppler_col1>=1 && ...     % secure the SP is within DDM range
             rx_alt_corrected1>=rx_alt_bins(1) && rx_alt_corrected1<=rx_alt_bins(end) && ...
             inc_angle1>=0 && inc_angle1<=80                     % ensure interpolate within reasonable range
 
-            A_eff1 = get_ddm_Aeff4(rx_alt_corrected1,inc_angle1,az_angle1, ...
+            % effective scattering area
+            A_eff1 = get_ddm_Aeff5(rx_alt1,inc_angle1,az_angle1, ...
                 rx_alt_bins,inc_angle_bins,az_angle_bins, ...
                 sp_delay_row1,sp_doppler_col1,chi2,A_phy_LUT_all);
 
-            % derive NBRCS - single theoretical SP bin
-            delay_intg1 = floor(sp_delay_row1)+1;
-            delay_frac1 = sp_delay_row1-floor(sp_delay_row1);
+            % nbrcs for SP bin
+            [brcs_copol_ddma1,brcs_xpol_ddma1,A_eff_ddma1] = get_ddma_v1(brcs_copol1,brcs_xpol1,A_eff1, ...
+                sp_delay_row1,sp_doppler_col1);
 
-            doppler_intg1 = floor(sp_doppler_col1)+1;
-            doppler_frac1 = sp_doppler_col1-floor(sp_doppler_col1);
+            nbrcs_copol_v1_1 = brcs_copol_ddma1/A_eff_ddma1;
+            nbrcs_xpol_v1_1 = brcs_xpol_ddma1/A_eff_ddma1;
 
-            if doppler_intg1<=4
-
-                brcs_copol_ddma1 = (1-doppler_frac1)*(1-delay_frac1)*brcs_copol1(doppler_intg1,delay_intg1)+ ...
-                                   (1-doppler_frac1)*delay_frac1*brcs_copol1(doppler_intg1,delay_intg1+1)+ ...
-                                   doppler_frac1*(1-delay_frac1)*brcs_copol1(doppler_intg1+1,delay_intg1)+ ...
-                                   doppler_frac1*delay_frac1*brcs_copol1(doppler_intg1+1,delay_intg1+1);
-    
-                brcs_xpol_ddma1  = (1-doppler_frac1)*(1-delay_frac1)*brcs_xpol1(doppler_intg1,delay_intg1)+ ...
-                                   (1-doppler_frac1)*delay_frac1*brcs_xpol1(doppler_intg1,delay_intg1+1)+ ...
-                                   doppler_frac1*(1-delay_frac1)*brcs_xpol1(doppler_intg1+1,delay_intg1)+ ...
-                                   doppler_frac1*delay_frac1*brcs_xpol1(doppler_intg1+1,delay_intg1+1);
-    
-                A_eff_ddma1      = (1-doppler_frac1)*(1-delay_frac1)*A_eff1(doppler_intg1,delay_intg1)+ ...
-                                   (1-doppler_frac1)*delay_frac1*A_eff1(doppler_intg1,delay_intg1+1)+ ...
-                                   doppler_frac1*(1-delay_frac1)*A_eff1(doppler_intg1+1,delay_intg1)+ ...
-                                   doppler_frac1*delay_frac1*A_eff1(doppler_intg1+1,delay_intg1+1);
-
-            elseif doppler_intg1>4
-
-                brcs_copol_ddma1 = (1-delay_frac1)*brcs_copol1(doppler_intg1,delay_intg1)+ ...
-                                   delay_frac1*brcs_copol1(doppler_intg1,delay_intg1+1);
-    
-                brcs_xpol_ddma1  = (1-delay_frac1)*brcs_xpol1(doppler_intg1,delay_intg1)+ ...
-                                   delay_frac1*brcs_xpol1(doppler_intg1,delay_intg1+1);
-    
-                A_eff_ddma1      = (1-delay_frac1)*A_eff1(doppler_intg1,delay_intg1)+ ...
-                                   delay_frac1*A_eff1(doppler_intg1,delay_intg1+1);
-
-            end
-
-            nbrcs_copol1 = brcs_copol_ddma1/A_eff_ddma1;
-            nbrcs_xpol1 = brcs_xpol_ddma1/A_eff_ddma1;            
-
-            % coherent reflection
-            [CR1,CS1] = coh_det(counts_LHCP1,snr_LHCP1);
+            nbrcs_scatter_area_v1(j,i) = A_eff_ddma1;
             
-            A_eff(:,:,j,i) = A_eff1;
-            nbrcs_scatter_area(j,i) = A_eff_ddma1;
+            nbrcs_copol_v1(j,i) = nbrcs_copol_v1_1;
+            nbrcs_xpol_v1(j,i) = nbrcs_xpol_v1_1;
 
-            nbrcs_copol(j,i) = nbrcs_copol1;
-            nbrcs_xpol(j,i) = nbrcs_xpol1;
+            % nbrcs for 3*3 bin
+            [brcs_copol_ddma2,brcs_xpol_ddma2,A_eff_ddma2] = get_ddma_v1(brcs_copol1,brcs_xpol1,A_eff1, ...
+                sp_delay_row1,sp_doppler_col1);
 
-            coherency_ratio(j,i) = CR1;
-            coherency_state(j,i) = CS1;
+            nbrcs_copol_v2_1 = brcs_copol_ddma2/A_eff_ddma2;
+            nbrcs_xpol_v2_1 = brcs_xpol_ddma2/A_eff_ddma2;
+
+            nbrcs_scatter_area_v2(j,i) = A_eff_ddma2;
             
+            nbrcs_copol_v2(j,i) = nbrcs_copol_v2_1;
+            nbrcs_xpol_v2(j,i) = nbrcs_xpol_v2_1;
+      
         end
 
     end
 end
 
 A_eff(:,:,J/2+1:J,:) = A_eff(:,:,1:J/2,:);
-nbrcs_scatter_area(J/2+1:J,:) = nbrcs_scatter_area(1:J/2,:);
 
-ddm_nbrcs = [nbrcs_copol;nbrcs_xpol];
+nbrcs_scatter_area_v1(J/2+1:J,:) = nbrcs_scatter_area_v1(1:J/2,:);
+nbrcs_scatter_area_v2(J/2+1:J,:) = nbrcs_scatter_area_v2(1:J/2,:);
 
-coherency_ratio(J/2+1:J,:) = coherency_ratio(1:J/2,:);
-coherency_state(J/2+1:J,:) = coherency_state(1:J/2,:);
+ddm_nbrcs_v1 = [nbrcs_copol_v1;nbrcs_xpol_v1];
+ddm_nbrcs_v2 = [nbrcs_copol_v2;nbrcs_xpol_v2];
 
-L1_postCal.A_eff = A_eff;
-L1_postCal.nbrcs_scatter_area = nbrcs_scatter_area;
+L1_postCal.eff_scatter = A_eff;
 
-L1_postCal.ddm_nbrcs = ddm_nbrcs;
+L1_postCal.nbrcs_scatter_area_v1 = nbrcs_scatter_area_v1;
+L1_postCal.nbrcs_scatter_area_v2 = nbrcs_scatter_area_v2;
 
-L1_postCal.coherency_ratio = coherency_ratio;
-L1_postCal.coherency_state = coherency_state;
+L1_postCal.ddm_nbrcs_v1 = ddm_nbrcs_v1;
+L1_postCal.ddm_nbrcs_v2 = ddm_nbrcs_v2;
 
-% Part 7: fresnel dimensions
+% Part 7: coherence detection
+clc
+
+rmsd_delay_span_chips               = 1.5;  % delay span over which to compute error relative to WAF
+fft_interpolation_factor            = 10;   % used in getRongowaiWAFRMSD for interpolation
+power_vs_delay_noise_floor_rows     = 5;    % use in getRongowaiWAFRMSD power vs delay noise floor estimation
+power_vs_delay_snr_min              = -10;  % minimum power vs delay snr threshold
+aircraft_alt_min                    = 2e3;  % minimum height of aircraft, otherwise coherence state is 'uncertain'
+max_peak_delay_row                  = 30;   % only use power vs delay waveforms where the peak is less than this
+
+ac_alt = rx_pos_lla(:,3);
+
+coherence_metric      = NaN(10,length(ac_alt));
+coherence_state       = NaN(10,length(ac_alt));
+power_vs_delay_snr_db = NaN(10,length(ac_alt));
+peak_delay_row        = NaN(10,length(ac_alt));
+
+for channel = 1:10      % channel-by-channel processing
+
+    altitude  = ac_alt;
+    ddm       = squeeze(ddm_power_counts(:,:,channel,:));     % select one channel at a time
+    index     = 1:1:length(ac_alt);
+
+    % select valid DDMs
+    zeros_check = squeeze(sum(sum(ddm,1),2));           % select valid DDMs
+    idx         = find(zeros_check>0);
+    altitude    = altitude(idx);
+    ddm         = ddm(:,:,idx);
+    index       = index(idx);
+
+    nan_check = squeeze(sum(sum(ddm,1),2));
+    idx         = find(~isnan(nan_check));
+    altitude    = altitude(idx);
+    ddm         = ddm(:,:,idx);
+    index       = index(idx);
+
+    peak_delay_row_index = NaN(size(altitude));
+    for z=1:length(altitude)
+        i                           = index(z);
+        hold_p_vs_delay             = squeeze(ddm(:,:,z));
+        hold_p_vs_delay             = nansum(hold_p_vs_delay,1);
+        [~,m]                       = nanmax(hold_p_vs_delay);
+        peak_delay_row(channel,i)   = m;
+        peak_delay_row_index(z)     = m;
+    end
+
+    idx             = find(peak_delay_row_index<=max_peak_delay_row); % detection not attempted if peak exceeds this limit
+    ddm             = ddm(:,:,idx);
+    index           = index(idx);
+    altitude        = altitude(idx);
+
+    for z=1:length(altitude)
+        i = index(z);
+
+        outputs                             = getRongowaiWAFRMSD(squeeze(ddm(:,:,z)),delay_bin_res, ...
+                                                                 rmsd_delay_span_chips,fft_interpolation_factor, ...
+                                                                 power_vs_delay_noise_floor_rows);
+
+        coherence_metric(channel,i)         = outputs.rmsd;
+        power_vs_delay_snr_db(channel,i)    = outputs.power_vs_delay_snr_db;
+
+        if power_vs_delay_snr_db(channel,i)<power_vs_delay_snr_min || altitude(z)<aircraft_alt_min
+            coherence_state(channel,i) = 5; % Uncertain coherence state
+        elseif coherence_metric(channel,i)<=0.25
+            coherence_state(channel,i) = 1; % With high confidence, state is dominantly coherent
+        elseif coherence_metric(channel,i)>0.25 && coherence_metric(channel,i)<=0.50
+            coherence_state(channel,i) = 2; % State is likely coherent
+        elseif coherence_metric(channel,i)>0.50 && coherence_metric(channel,i)<0.75
+            coherence_state(channel,i) = 3; % State is likely mixed/weakly diffuse
+        elseif coherence_metric(channel,i)>=0.75
+            coherence_state(channel,i) = 4; % With high confidence, state is dominantly incoherent
+        end
+
+    end 
+
+end
+
+coherence_metric(channel+1:channel+10,:) = coherence_metric;
+coherence_state(channel+1:channel+10,:) = coherence_state;
+
+L1_postCal.coherence_metric = coherence_metric;
+L1_postCal.coherence_state = coherence_state;
+
+% Part 8: fresnel dimensions
 fresnel_coeff = zeros(J,I)+invalid;
 fresnel_minor = zeros(J,I)+invalid;
 fresnel_major = zeros(J,I)+invalid;
@@ -1464,28 +1555,43 @@ L1_postCal.fresnel_major = fresnel_major;
 L1_postCal.fresnel_minor = fresnel_minor;
 L1_postCal.fresnel_orientation = fresnel_orientation;
 
-% Cross Pol
-nbrcs_cross_pol = zeros(J,I)+invalid;
+% Cross Pol - 28 June
+nbrcs_cross_pol_v1 = zeros(J,I)+invalid;
+nbrcs_cross_pol_v2 = zeros(J,I)+invalid;
 
 for i = 1:I
     for j = 1:J/2
 
-        nbrcs_LHCP1 = ddm_nbrcs(j,i);
-        nbrcs_RHCP1 = ddm_nbrcs(j+J/2,i);
+        nbrcs_LHCP1 = ddm_nbrcs_v1(j,i);
+        nbrcs_RHCP1 = ddm_nbrcs_v1(j+J/2,i);
+
+        nbrcs_LHCP2 = ddm_nbrcs_v2(j,i);
+        nbrcs_RHCP2 = ddm_nbrcs_v2(j+J/2,i);
 
         CP1 = nbrcs_LHCP1/nbrcs_RHCP1;
+        CP2 = nbrcs_LHCP2/nbrcs_RHCP2;
+        
         if CP1>0
             CP_db1 = pow2db(CP1);
-            nbrcs_cross_pol(j,i) = CP_db1;
+            nbrcs_cross_pol_v1(j,i) = CP_db1;
             
-        end        
+        end
+
+        if CP2>0
+            CP_db2 = pow2db(CP2);
+            nbrcs_cross_pol_v2(j,i) = CP_db2;
+            
+        end
 
     end
 end
 
-nbrcs_cross_pol(11:20,:) = -1*nbrcs_cross_pol(1:10,:);
+nbrcs_cross_pol_v1(11:20,:) = -1*nbrcs_cross_pol_v1(1:10,:);
+nbrcs_cross_pol_v2(11:20,:) = -1*nbrcs_cross_pol_v2(1:10,:);
 
-L1_postCal.nbrcs_cross_pol = nbrcs_cross_pol;
+L1_postCal.nbrcs_cross_pol_v1 = nbrcs_cross_pol_v1;
+L1_postCal.nbrcs_cross_pol_v2 = nbrcs_cross_pol_v2;
+
 L1_postCal.lna_noise_figure = zeros(J,I)+3;         % LNA noise figure is 3 dB according to the specification
 
 % Quality Flags

@@ -19,7 +19,7 @@ switch ANZ_port
         
     case 2
         ddm_counts_db_ch = ddm_counts_cal_db(2,:);
-        ddm_power_dbm_ch = ddm_power_cal_dbm(2,:);
+        ddm_power_dbm_ch = ddm_power_cal_dbm(2,:)-11.1;     % LHCP minus 11.1 dB - 27 June
 
         std_dev_ch = std_dev(2);
 
@@ -28,7 +28,7 @@ switch ANZ_port
             
     case 3
         ddm_counts_db_ch = ddm_counts_cal_db(3,:);
-        ddm_power_dbm_ch = ddm_power_cal_dbm(3,:);
+        ddm_power_dbm_ch = ddm_power_cal_dbm(3,:)-14.4;     % RHCP minus 14.4 dB - 27 June
 
         std_dev_ch = std_dev(3);
 
@@ -47,4 +47,6 @@ ddm_power_dbm = zeros(size(ddm_counts_db));
 ddm_power_dbm(:) = interp1(ddm_counts_db_ch,ddm_power_dbm_ch,ddm_counts_db(:),'spline');
 ddm_power_dbm = ddm_power_dbm+std_dev_db_ch-binning_thres_db_ch;    % cable loss to be compensated when computing BRCS
 
-ddm_power_watts = db2pow(ddm_power_dbm-30-9);                       % convert to watts, 9 dB difference from L1a
+% convert to watts
+% remove 9 dB difference which has been compensated above 27 June
+ddm_power_watts = db2pow(ddm_power_dbm-30);                         
