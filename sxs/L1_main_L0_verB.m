@@ -72,7 +72,7 @@ SV_PRN_LUT = SV_PRN_LUT(:,1:2);
 SV_eirp_LUT = readmatrix([gps_path SV_eirp_filename]);
 
 % load and process nadir NGRx-GNSS antenna patterns
-% update antenna pattern LUT - 28 June
+% update antenna pattern LUT - new pattern LUT - 28 June
 rng_path = '../dat/rng/';
 
 LHCP_L_filename = 'GNSS_LHCP_L_gain_db_i_v2.dat';
@@ -124,7 +124,7 @@ for l = 1:L-1
 end
 
 % L1 dictionary name
-L1_dict_name = '../dat/L1_Dict/L1_Dict_v2_2.xlsx';
+L1_dict_name = '../dat/L1_Dict/L1_Dict_v2_2.xlsx';      % L1 dictionary updated
 
 %% get post-calibrated L1 product
 clc
