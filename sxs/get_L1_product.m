@@ -83,6 +83,24 @@ eng_timestamp = double(ncread(L0_filename,'/eng/packet_creation_time'));
 zenith_ant_temp_eng = double(ncread(L0_filename,'/eng/zenith_ant_temp'));
 nadir_ant_temp_eng = double(ncread(L0_filename,'/eng/nadir_ant_temp'));
 
+% DCP and FSW versions - new change 30 June
+fsw_build_number = double(ncread(L0_filename,'/eng/fsw_build_number'));
+fsw_major_version_number = double(ncread(L0_filename,'/eng/fsw_major_version_number'));
+fsw_minor_version_number = double(ncread(L0_filename,'/eng/fsw_minor_version_number'));
+
+fsw_version = [num2str(fsw_major_version_number(100)) '.' ...
+               num2str(fsw_minor_version_number(100)) '.' ...
+               num2str(fsw_build_number(100))];
+
+% DCP and FSW versions
+dcp_build_number = double(ncread(L0_filename,'/eng/dcp_build_number'));
+dcp_major_version_number = double(ncread(L0_filename,'/eng/dcp_major_version_number'));
+dcp_minor_version_number = double(ncread(L0_filename,'/eng/dcp_minor_version_number'));
+
+dcp_version = [num2str(dcp_major_version_number(100)) '.' ...
+               num2str(dcp_minor_version_number(100)) '.' ...
+               num2str(dcp_build_number(100))];
+
 % the below scrpits filter valid data
 
 % rx-related variables
@@ -336,25 +354,47 @@ for i = 1:I
 
 end
 
-% write global variables
-time_coverage_start = string(datetime(ddm_utc(1),'ConvertFrom','posixtime'));
-L1_postCal.time_coverage_start = time_coverage_start;
+% time coverage - updated compliance results 30 June
+time_start = datetime(ddm_utc(1),'ConvertFrom','posixtime','format','yyyy-MM-dd HH:mm:ss');
+time_start = char(time_start);
+time_coverage_start = [time_start(1:10) 'T' time_start(end-7:end)];
 
-time_coverage_end = string(datetime(ddm_utc(end),'ConvertFrom','posixtime'));
-L1_postCal.time_coverage_end = time_coverage_end;
+time_end = datetime(ddm_utc(end),'ConvertFrom','posixtime','format','yyyy-MM-dd HH:mm:ss');
+time_end = char(time_end);
+time_coverage_end = [time_end(1:10) 'T' time_end(end-7:end)];
 
-L1_postCal.time_coverage_resolution = ddm_utc(2)-ddm_utc(1);
-
-% time coverage
 time_duration = ddm_utc(end)-ddm_utc(1)+1;
 hours = floor(time_duration/3600);
 minutes = floor((time_duration-hours*3600)/60);
 seconds = time_duration-hours*3600-minutes*60;
 time_coverage_duration = ['P0DT' num2str(hours) 'H' num2str(minutes) 'M' num2str(seconds) 'S'];
 
-L1_postCal.time_coverage_duration = time_coverage_duration;
+% write global variables - update compliance results 30 June
+% reordering 30 June
+L1_postCal.Conventions = 'CF-1.8, ACDD-1.3, ISO-8601';
+L1_postCal.title = 'Rongowai Level 1 Science Data Record Version 1.0';
+L1_postCal.history = join(['Mon Mar 20 22:21:12 2023: ncks -O -a -dsample,' ... % this line be the time produces L1
+    '0,' num2str(I) ',1 -L1 --cnk_dmn=sample,1000' ....
+    '--cnk_dmn=ddm,' num2str(J) '--cnk_dmn=delay,' num2str(M) '--cnk_dmn=doppler,' num2str(N) ...
+    '--cnk_dmn=local_map_lat,41 --cnk_dmn=local_map_lon,41' ...
+    '/tmp/qt_temp.MY8728 /tmp/qt_temp.jp8728\n./produce-L1-files' ...
+    'production_1@rongowai-data-1.rongowai.auckland.ac.nz 7 ' ...
+    time_coverage_start ' ' time_coverage_end ...
+    ' --allow-partial --out-file=test-v1.nc']);
+L1_postCal.standard_name_vocabulary = 'CF Standard Name Table v30';
+L1_postCal.comment = 'DDMs are calibrated into Power (Watts) and Bistatic Radar Cross Section (m^2)';
+L1_postCal.processing_level = '1';
+L1_postCal.creator_type = 'institution';
+L1_postCal.institution = 'University of Auckland (UoA)';
+L1_postCal.creator_name = 'Rongowai Science Payloads Operations Centre';
+L1_postCal.publisher_name = 'PO.DAAC';
+L1_postCal.publisher_email = 'rongowai.auckland.ac.nz';
+L1_postCal.publisher_url = 'spoc.auckland.ac.nz';
+L1_postCal.geospatial_lat_min = '-48.034N';
+L1_postCal.geospatial_lat_max = '-34.374N';
+L1_postCal.geospatial_lon_min = '165.319E';
+L1_postCal.geospatial_lon_max = '179.767E';
 
-% below is new for algorithm version 1.1
 ref_timestamp_utc = ddm_utc(1);
 
 pvt_timestamp_utc = pvt_utc-ref_timestamp_utc;
@@ -368,9 +408,9 @@ L1_postCal.dopp_resolution = doppler_bin_res;   % unit in Hz
 L1_postCal.dem_source = 'SRTM30-200m';
 
 % write algorithm and LUT versions
-% version numbers may change
+% version numbers may change when updating a LUT
 L1_postCal.l1_algorithm_version = '2.2';        % 27 June, algorithm change
-L1_postCal.l1_data_version = '2.2';             % 28 June, L1 dictionary change
+L1_postCal.l1_data_version = '2.3';             % 30 June, L1 dictionary change - compliance check
 L1_postCal.l1a_sig_LUT_version = '1';
 L1_postCal.l1a_noise_LUT_version = '1';
 L1_postCal.A_LUT_version = '1.1';               % 27 June               
@@ -384,6 +424,14 @@ L1_postCal.land_mask_version = '1';
 L1_postCal.surface_type_version = '1';
 L1_postCal.mean_sea_surface_version = '1';
 L1_postCal.per_bin_ant_version = '1';
+
+L1_postCal.fsw_version = fsw_version;
+L1_postCal.dcp_version = dcp_version;
+
+L1_postCal.time_coverage_start = time_coverage_start;
+L1_postCal.time_coverage_end = time_coverage_end;
+L1_postCal.time_coverage_resolution = ddm_utc(2)-ddm_utc(1);
+L1_postCal.time_coverage_duration = time_coverage_duration;
 
 % write timestamps and ac-related variables
 L1_postCal.pvt_timestamp_gps_week = pvt_gps_week;
@@ -1178,7 +1226,7 @@ for j = 1:J/2
 end
 
 % combine LHCP and RHCP results
-noise_floor = [repmat(noise_floor_LHCP,[M,N]);repmat(noise_floor_RHCP,[M,N])];
+noise_floor = [repmat(noise_floor_LHCP,[J/2,I]);repmat(noise_floor_RHCP,[J/2,I])];  % typo - 30 June
 ddm_snr = [snr_LHCP_db;snr_RHCP_db];
 snr_flag = [snr_flag_LHCP;snr_flag_RHCP];
 
