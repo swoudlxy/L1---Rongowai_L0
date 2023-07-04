@@ -1,8 +1,7 @@
-<<<<<<< HEAD
 % This function solves all L1 variables and packets as a structure for
 % processing multiple L0 files
 % Algorithm version 2.2
-% L1 dictionary version 2.2
+% L1 dictionary version 2.3
 
 function L1_postCal = get_L1_product(   L0_filename, ...
                                         L1a_cal_ddm_counts_db,L1a_cal_ddm_power_dbm, ...
@@ -93,7 +92,6 @@ fsw_version = [num2str(fsw_major_version_number(100)) '.' ...
                num2str(fsw_minor_version_number(100)) '.' ...
                num2str(fsw_build_number(100))];
 
-% DCP and FSW versions
 dcp_build_number = double(ncread(L0_filename,'/eng/dcp_build_number'));
 dcp_major_version_number = double(ncread(L0_filename,'/eng/dcp_major_version_number'));
 dcp_minor_version_number = double(ncread(L0_filename,'/eng/dcp_minor_version_number'));
@@ -1381,16 +1379,17 @@ L1_postCal.norm_refl_waveform = norm_refl_waveform;
 % Part 6: NBRCS and other related parameters
 % significant changes in this section with a few new functions
 % 28 June
+% remove 3*3 NBRCS related scripts - 30 June
 A_eff = zeros(M,N,J,I)+invalid;
 
 nbrcs_scatter_area_v1 = zeros(J,I)+nan;
-nbrcs_scatter_area_v2 = zeros(J,I)+nan;
+%nbrcs_scatter_area_v2 = zeros(J,I)+nan;
 
 nbrcs_copol_v1 = zeros(J/2,I)+nan;
 nbrcs_xpol_v1 = zeros(J/2,I)+nan;
 
-nbrcs_copol_v2 = zeros(J/2,I)+nan;
-nbrcs_xpol_v2 = zeros(J/2,I)+nan;
+%nbrcs_copol_v2 = zeros(J/2,I)+nan;
+%nbrcs_xpol_v2 = zeros(J/2,I)+nan;
 
 % 2D ambiguity function
 chi2 = get_chi2(N,M,center_delay_bin+1,center_doppler_bin+1, ...
@@ -1421,8 +1420,8 @@ for i = 1:I
         brcs_copol1 = brcs_copol(:,:,j,i);
         brcs_xpol1 = brcs_xpol(:,:,j,i);
 
-        counts_LHCP1 = ddm_power_counts(:,:,j,i);
-        snr_LHCP1 = ddm_snr(j,i);
+        %counts_LHCP1 = ddm_power_counts(:,:,j,i);
+        %snr_LHCP1 = ddm_snr(j,i);
         
         % evaluate delay and Doppler bin location at SP
         sp_delay_row1 = sp_delay_row(j,i)+1;
@@ -1452,16 +1451,16 @@ for i = 1:I
             nbrcs_xpol_v1(j,i) = nbrcs_xpol_v1_1;
 
             % nbrcs for 3*3 bin
-            [brcs_copol_ddma2,brcs_xpol_ddma2,A_eff_ddma2] = get_ddma_v1(brcs_copol1,brcs_xpol1,A_eff1, ...
-                sp_delay_row1,sp_doppler_col1);
+            %[brcs_copol_ddma2,brcs_xpol_ddma2,A_eff_ddma2] = get_ddma_v2(brcs_copol1,brcs_xpol1,A_eff1, ...
+            %    sp_delay_row1,sp_doppler_col1);
 
-            nbrcs_copol_v2_1 = brcs_copol_ddma2/A_eff_ddma2;
-            nbrcs_xpol_v2_1 = brcs_xpol_ddma2/A_eff_ddma2;
+            %nbrcs_copol_v2_1 = brcs_copol_ddma2/A_eff_ddma2;
+            %nbrcs_xpol_v2_1 = brcs_xpol_ddma2/A_eff_ddma2;
 
-            nbrcs_scatter_area_v2(j,i) = A_eff_ddma2;
+            %nbrcs_scatter_area_v2(j,i) = A_eff_ddma2;
             
-            nbrcs_copol_v2(j,i) = nbrcs_copol_v2_1;
-            nbrcs_xpol_v2(j,i) = nbrcs_xpol_v2_1;
+            %nbrcs_copol_v2(j,i) = nbrcs_copol_v2_1;
+            %nbrcs_xpol_v2(j,i) = nbrcs_xpol_v2_1;
       
         end
 
@@ -1471,22 +1470,20 @@ end
 A_eff(:,:,J/2+1:J,:) = A_eff(:,:,1:J/2,:);
 
 nbrcs_scatter_area_v1(J/2+1:J,:) = nbrcs_scatter_area_v1(1:J/2,:);
-nbrcs_scatter_area_v2(J/2+1:J,:) = nbrcs_scatter_area_v2(1:J/2,:);
+%nbrcs_scatter_area_v2(J/2+1:J,:) = nbrcs_scatter_area_v2(1:J/2,:);
 
 ddm_nbrcs_v1 = [nbrcs_copol_v1;nbrcs_xpol_v1];
-ddm_nbrcs_v2 = [nbrcs_copol_v2;nbrcs_xpol_v2];
+%ddm_nbrcs_v2 = [nbrcs_copol_v2;nbrcs_xpol_v2];
 
 L1_postCal.eff_scatter = A_eff;
 
 L1_postCal.nbrcs_scatter_area_v1 = nbrcs_scatter_area_v1;
-L1_postCal.nbrcs_scatter_area_v2 = nbrcs_scatter_area_v2;
+%L1_postCal.nbrcs_scatter_area_v2 = nbrcs_scatter_area_v2;
 
 L1_postCal.ddm_nbrcs_v1 = ddm_nbrcs_v1;
-L1_postCal.ddm_nbrcs_v2 = ddm_nbrcs_v2;
+%L1_postCal.ddm_nbrcs_v2 = ddm_nbrcs_v2;
 
 % Part 7: coherence detection
-clc
-
 rmsd_delay_span_chips               = 1.5;  % delay span over which to compute error relative to WAF
 fft_interpolation_factor            = 10;   % used in getRongowaiWAFRMSD for interpolation
 power_vs_delay_noise_floor_rows     = 5;    % use in getRongowaiWAFRMSD power vs delay noise floor estimation
@@ -1605,8 +1602,9 @@ L1_postCal.fresnel_minor = fresnel_minor;
 L1_postCal.fresnel_orientation = fresnel_orientation;
 
 % Cross Pol - 28 June
+% remove 3*3 related - 30 June
 nbrcs_cross_pol_v1 = zeros(J,I)+invalid;
-nbrcs_cross_pol_v2 = zeros(J,I)+invalid;
+%nbrcs_cross_pol_v2 = zeros(J,I)+invalid;
 
 for i = 1:I
     for j = 1:J/2
@@ -1614,11 +1612,11 @@ for i = 1:I
         nbrcs_LHCP1 = ddm_nbrcs_v1(j,i);
         nbrcs_RHCP1 = ddm_nbrcs_v1(j+J/2,i);
 
-        nbrcs_LHCP2 = ddm_nbrcs_v2(j,i);
-        nbrcs_RHCP2 = ddm_nbrcs_v2(j+J/2,i);
+        %nbrcs_LHCP2 = ddm_nbrcs_v2(j,i);
+        %nbrcs_RHCP2 = ddm_nbrcs_v2(j+J/2,i);
 
         CP1 = nbrcs_LHCP1/nbrcs_RHCP1;
-        CP2 = nbrcs_LHCP2/nbrcs_RHCP2;
+        %CP2 = nbrcs_LHCP2/nbrcs_RHCP2;
         
         if CP1>0
             CP_db1 = pow2db(CP1);
@@ -1626,20 +1624,20 @@ for i = 1:I
             
         end
 
-        if CP2>0
-            CP_db2 = pow2db(CP2);
-            nbrcs_cross_pol_v2(j,i) = CP_db2;
+        %if CP2>0
+        %    CP_db2 = pow2db(CP2);
+        %    nbrcs_cross_pol_v2(j,i) = CP_db2;
             
-        end
+        %end
 
     end
 end
 
 nbrcs_cross_pol_v1(11:20,:) = -1*nbrcs_cross_pol_v1(1:10,:);
-nbrcs_cross_pol_v2(11:20,:) = -1*nbrcs_cross_pol_v2(1:10,:);
+%nbrcs_cross_pol_v2(11:20,:) = -1*nbrcs_cross_pol_v2(1:10,:);
 
 L1_postCal.nbrcs_cross_pol_v1 = nbrcs_cross_pol_v1;
-L1_postCal.nbrcs_cross_pol_v2 = nbrcs_cross_pol_v2;
+%L1_postCal.nbrcs_cross_pol_v2 = nbrcs_cross_pol_v2;
 
 L1_postCal.lna_noise_figure = zeros(J,I)+3;         % LNA noise figure is 3 dB according to the specification
 
@@ -1649,37 +1647,37 @@ quality_flags1 = zeros(J,I)+invalid;
 for i = 1:I
     for j = 1:J
 
-        quality_flag1_1 = zeros(1,26);
+        quality_flag1_1 = zeros(1,22);
 
-        % flag 2, 3 and 23
-        rx_roll1 = rx_roll(i);
-        rx_pitch1 = rx_pitch(i);
-        rx_yaw1 = rx_yaw(i);
+        % flag 2, 3 and 4
+        rx_roll1 = rad2deg(rx_roll(i));
+        rx_pitch1 = rad2deg(rx_pitch(i));
+        rx_yaw1 = rad2deg(rx_yaw(i));
     
-        if (rx_roll1 >= 30) || (rx_pitch1 >= 10) || (rx_yaw1 >= 5)
-            quality_flag1_1(3) = 1;
-        else
+        if abs(rx_roll1)<=30 && abs(rx_pitch1)<=10
             quality_flag1_1(2) = 1;
+        else
+            quality_flag1_1(3) = 1;
         end
 
-        if rx_roll1 > 1
-            quality_flag1_1(23) = 1;
+        if rx_yaw1==-4
+            quality_flag1_1(4) = 1;
         end
 
-        % flag 4
-        quality_flag1_1(4) = 0;
+        % flag 5 - set if DDM is a test pattern - default 0
+        quality_flag1_1(5) = 0;
 
-        % flag 5 and 6
+        % flag 6 and 7
         trans_id1 = transmitter_id(j,i);
         if trans_id1 == 0
-            quality_flag1_1(5) = 1;
-        end
-
-        if trans_id1 == 28
             quality_flag1_1(6) = 1;
         end
 
-        % flag 7 and 10
+        if trans_id1 == 28
+            quality_flag1_1(7) = 1;
+        end
+
+        % flag 8 and 11
         snr_db1 = ddm_snr(j,i);
 
         if i > 1
@@ -1696,103 +1694,91 @@ for i = 1:I
             end
         end
 
-        % flag 8 and 9
+        % flag 9 and 10
         dist_to_coast1 = dist_to_coast_km(j,i);
 
-        if dist_to_coast1 > 0
-            quality_flag1_1(8) = 1;
-        end
-
-        if dist_to_coast1 > -25
+        if dist_to_coast1>0
             quality_flag1_1(9) = 1;
         end
 
-        % flag 11
+        if dist_to_coast1>-5 && dist_to_caost1<0
+            quality_flag1_1(10) = 1;
+        end
+
+        % flag 12
         ant_temp1 = ant_temp_nadir(i);
         if i > 1
             ant_temp2 = ant_temp_nadir(i-1);
             rate = (ant_temp2-ant_temp1)*60;
 
             if rate > 1
-                quality_flag1_1(11) = 1;
+                quality_flag1_1(12) = 1;
             end
 
         end
 
-        % flag 12
+        % flag 13
         zenith_code_phase1 = zenith_code_phase(j,i);
         signal_code_phase1 = delay_correction(meter2chips(add_range_to_sp(j,i)),1023);
         diff1 = zenith_code_phase1-signal_code_phase1;
         if diff1 >= 10
-            quality_flag1_1(12) = 1;
+            quality_flag1_1(13) = 1;
         end
 
-        % flag 15 and 16
+        % flag 14 and 15
         sp_delay_row1 = sp_delay_row(j,i);
         sp_dopp_col1 = sp_doppler_col(j,i);
 
-        if (sp_delay_row1<15)||(sp_delay_row1>35)
+        if (sp_delay_row1<14)||(sp_delay_row1>34)
+            quality_flag1_1(14) = 1;
+        end
+
+        if (sp_dopp_col1<1)||(sp_dopp_col1>3)
             quality_flag1_1(15) = 1;
         end
 
-        if (sp_dopp_col1<2)||(sp_dopp_col1>4)
+        % flag 16
+        ddma1 = nbrcs_scatter_area_v1(j,i);
+
+        if isnan(ddma1) || ddma1<0
             quality_flag1_1(16) = 1;
         end
 
         % flag 17
-        if (floor(sp_delay_row1) < 38) && (floor(sp_delay_row1) > 0) && ...
-                (floor(sp_dopp_col1) < 5) && (floor(sp_dopp_col1) > 1)
-            brcs_ddma = brcs(floor(sp_dopp_col1)-1:floor(sp_dopp_col1)+1, ...
-                            floor(sp_delay_row1):floor(sp_dopp_col1)+3);
-            det = find(brcs_ddma<0, 1);
-            if ~isempty(det)
-                quality_flag1_1(17) = 1;
-            end
-        end
-
-        % flag 18
         tx_pos_x1 = tx_pos_x(j,i);
         prn_code1 = prn_code(j,i);
         if (tx_pos_x1 == 0) && (~isnan(prn_code1))
+            quality_flag1_1(17) = 1;
+        end
+
+        % flag 18
+        sx_pos_x1 = sx_pos_x(j,i);
+        if (sx_pos_x1 == invalid) && (~isnan(prn_code1))
             quality_flag1_1(18) = 1;
         end
 
         % flag 19
-        sx_pos_x1 = sx_pos_x(j,i);
-        if (sx_pos_x1 == invalid) && (~isnan(prn_code1))
+        rx_gain1 = sx_rx_gain_copol(j,i);
+        if (rx_gain1 == invalid) && (~isnan(prn_code1))
             quality_flag1_1(19) = 1;
         end
 
-        % flag 20
-        rx_gain1 = sx_rx_gain_copol(j,i);
-        if (rx_gain1 == invalid) && (~isnan(prn_code1))
+        % flag 20 & 22
+        rx_alt = rx_pos_lla(i,3);
+        if rx_alt > 15000
             quality_flag1_1(20) = 1;
         end
 
-        quality_flag1_1(21) = 1;
-
-        % flag 22 & 26
-        rx_alt = rx_pos_lla(i,3);
-        if rx_alt > 15000
+        if rx_alt < 700
             quality_flag1_1(22) = 1;
         end
 
-        if rx_alt < 700
-            quality_flag1_1(26) = 1;
-        end
-
-        % flag 24
-        prn1 = prn_code(j,i);
-        if prn1 == 28
-            quality_flag1_1(24) = 1;
-        end
-
-        % flag 25
+        % flag 21
         rx_vel_xyz1 = rx_vel_xyz(i,:);
         rx_speed1 = norm(rx_vel_xyz1);
 
-        if rx_speed1>150
-            quality_flag1_1(25) = 1;
+        if rx_speed1>=150
+            quality_flag1_1(21) = 1;
         end
 
         % flag 1
@@ -1801,7 +1787,7 @@ for i = 1:I
             quality_flag1_1(5) == 1 || ...
             quality_flag1_1(6) == 1 || ...
             quality_flag1_1(7) == 1 || ...
-            quality_flag1_1(10) == 1 || ...
+            quality_flag1_1(8) == 1 || ...
             quality_flag1_1(11) == 1 || ...
             quality_flag1_1(12) == 1 || ...
             quality_flag1_1(13) == 1 || ...
@@ -1811,11 +1797,7 @@ for i = 1:I
             quality_flag1_1(17) == 1 || ...
             quality_flag1_1(18) == 1 || ...
             quality_flag1_1(20) == 1 || ...
-            quality_flag1_1(22) == 1 || ...
-            quality_flag1_1(23) == 1 || ...
-            quality_flag1_1(24) == 1 || ...
-            quality_flag1_1(25) == 1 || ...
-            quality_flag1_1(26) == 1)
+            quality_flag1_1(22) == 1)
         
             quality_flag1_1(1) = 1;
 
@@ -1826,7 +1808,8 @@ for i = 1:I
     end
 end
 
-=======
+%{
+%=======
 % This function solves all L1 variables and packets as a structure for
 % processing multiple L0 files
 % Algorithm version 2.2
@@ -3656,3 +3639,4 @@ end
 
 >>>>>>> 533a4a80b6c994674a6e1315cb442a711c900a39
 L1_postCal.quality_flags1 = quality_flags1;
+%}
