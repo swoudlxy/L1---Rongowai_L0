@@ -1434,7 +1434,7 @@ for i = 1:I
             inc_angle1>=0 && inc_angle1<=80                     % ensure interpolate within reasonable range
 
             % effective scattering area
-            A_eff1 = get_ddm_Aeff5(rx_alt1,inc_angle1,az_angle1, ...
+            A_eff1 = get_ddm_Aeff5(rx_alt_corrected1,inc_angle1,az_angle1, ...  % typo: 9 July
                 rx_alt_bins,inc_angle_bins,az_angle_bins, ...
                 sp_delay_row1,sp_doppler_col1,chi2,A_phy_LUT_all);
 
