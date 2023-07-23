@@ -6,7 +6,7 @@ clc
 L0_path = '../dat/raw/';
 L0_filenames = dir([L0_path '*.nc']);
 
-L = length(L0_filenames);
+K = length(L0_filenames);
 
 %% load external files
 clc
@@ -130,10 +130,10 @@ L1_dict_name = '../dat/L1_Dict/L1_Dict_v2_3.xlsx';      % L1 dictionary updated
 %% get post-calibrated L1 product
 clc
 
-for l = 2
+for k = 2
 
-    filename = L0_filenames(l).name;
-    path = L0_filenames(l).folder;
+    filename = L0_filenames(k).name;
+    path = L0_filenames(k).folder;
 
     L0_filename = [path '/' filename];
 
@@ -151,6 +151,6 @@ for l = 2
     L1_netCDF = ['../out/L1_netCDFs/' filename(1:end-3) '_L1.nc'];
     sample_info = get_netcdf(L1_netCDF,L1_dict_name,L1_postCal);
     
-    disp(l);    % display the number of files being processed
+    disp(k);    % display the number of files being processed
 
 end
