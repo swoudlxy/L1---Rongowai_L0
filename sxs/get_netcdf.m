@@ -137,7 +137,7 @@ for l = 51:L
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
 
     elseif strcmp(dimension,'ddm')
-        val_value = cast(val_value,data_type);
+        val_value = cast(val_value,dtype);
 
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'ddm',num_ddm}, ...
@@ -149,7 +149,7 @@ for l = 51:L
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
 
     elseif strcmp(dimension,'sample, ddm')
-        val_value = cast(val_value,data_type);
+        val_value = cast(val_value,dtype);
 
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'ddm',num_ddm,'sample',num_sample}, ...
@@ -174,7 +174,7 @@ for l = 51:L
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
         
     elseif strcmp(dimension,'sample, ddm, delay, doppler')
-        val_value = cast(val_value,data_type);
+        val_value = cast(val_value,dtype);
 
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'doppler',doppler,'delay',delay,'ddm',num_ddm,'sample',num_sample}, ...
@@ -186,7 +186,7 @@ for l = 51:L
         ncwriteatt(L1_netCDF_name,netCDF_field_name,'comment',comment);
 
     elseif strcmp(dimension,'sample, ddm, delay')
-        val_value = cast(val_value,data_type);
+        val_value = cast(val_value,dtype);
         nccreate(L1_netCDF_name,netCDF_field_name, ...
                  'Dimensions',{'x',1,'delay',delay,'ddm',num_ddm,'sample',num_sample}, ...
                  'FillValue','disable','Datatype',dtype);

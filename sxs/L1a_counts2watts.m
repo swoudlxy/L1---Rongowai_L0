@@ -3,7 +3,6 @@
 function ddm_power_watts = L1a_counts2watts(ddm_counts,ANZ_port,ddm_counts_cal_db,ddm_power_cal_dbm,std_dev)
 
 binning_thres_db = [50.5 49.6 50.4];
-%cable_loss_db = [1.8051,0.6600,0.5840];
 
 % select approiate calibration constants based on the input ANZ port channel
 switch ANZ_port
@@ -15,7 +14,6 @@ switch ANZ_port
         std_dev_ch = std_dev(1);
 
         binning_thres_db_ch = binning_thres_db(1);
-        %cable_loss_db_ch = cable_loss_db(1);
         
     case 2
         ddm_counts_db_ch = ddm_counts_cal_db(2,:);
@@ -23,8 +21,7 @@ switch ANZ_port
 
         std_dev_ch = std_dev(2);
 
-        binning_thres_db_ch = binning_thres_db(2);
-        %cable_loss_db_ch = cable_loss_db(2);        
+        binning_thres_db_ch = binning_thres_db(2); 
             
     case 3
         ddm_counts_db_ch = ddm_counts_cal_db(3,:);
@@ -33,7 +30,6 @@ switch ANZ_port
         std_dev_ch = std_dev(3);
 
         binning_thres_db_ch = binning_thres_db(3);
-        %cable_loss_db_ch = cable_loss_db(3);
 
 end
 
