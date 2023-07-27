@@ -1471,7 +1471,8 @@ for i = 1:I
         if sp_delay_row1<=39 && sp_delay_row1>=1 && ...
             sp_doppler_col1<=5 && sp_doppler_col1>=1 && ...     % secure the SP is within DDM range
             rx_alt_corrected1>=rx_alt_bins(1) && rx_alt_corrected1<=rx_alt_bins(end) && ...
-            inc_angle1>=0 && inc_angle1<=80                     % ensure interpolate within reasonable range
+            inc_angle1>=0 && inc_angle1<=80 && ~isnan(az_angle1)% ensure interpolate within reasonable range
+            % one more condition added for az_angle 27 July
 
             % effective scattering area
             A_eff1 = get_ddm_Aeff5(rx_alt_corrected1,inc_angle1,az_angle1, ...  % typo: 9 July
