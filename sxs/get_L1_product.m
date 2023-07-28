@@ -1090,7 +1090,7 @@ noise_floor_all_RHCP = zeros(J/2,I)+invalid;
 
 % noise floor for all samples
 for j = 1:J/2
-    for i = I:I
+    for i = 1:I
 
         counts_LHCP1 = ddm_power_counts(:,:,j,i);
         counts_RHCP1 = ddm_power_counts(:,:,j+J/2,i);
