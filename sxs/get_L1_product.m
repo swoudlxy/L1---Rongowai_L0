@@ -1491,6 +1491,8 @@ for i = 1:I
             nbrcs_copol_v1(j,i) = nbrcs_copol_v1_1;
             nbrcs_xpol_v1(j,i) = nbrcs_xpol_v1_1;
 
+            A_eff(:,:,j,i) = A_eff1;                    % 18 Aug - pass A_eff to the L1_postCal
+
             % nbrcs for 3*3 bin
             %[brcs_copol_ddma2,brcs_xpol_ddma2,A_eff_ddma2] = get_ddma_v2(brcs_copol1,brcs_xpol1,A_eff1, ...
             %    sp_delay_row1,sp_doppler_col1);
