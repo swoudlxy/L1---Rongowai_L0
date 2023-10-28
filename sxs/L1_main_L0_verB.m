@@ -15,8 +15,12 @@ clc
 L1a_path = '../dat/L1a_cal/';
 
 % L1a correction to new calibration table - 22 July 2023
-L1a_cal_ddm_counts = readmatrix([L1a_path 'L1A_cal_ddm_counts_v2.dat']);
-L1a_cal_ddm_power = readmatrix([L1a_path 'L1A_cal_ddm_power_v2.dat']);
+%L1a_cal_ddm_counts = readmatrix([L1a_path 'L1A_cal_ddm_counts_v2.dat']);
+%L1a_cal_ddm_power = readmatrix([L1a_path 'L1A_cal_ddm_power_v2.dat']);
+
+% L1a correction to new calibration table - 28 Oct 2023
+L1a_cal_ddm_counts_dB = readmatrix([L1a_path 'L1A_cal_ddm_counts_dB_v3.dat']);
+L1a_cal_ddm_power_dBm = readmatrix([L1a_path 'L1A_cal_ddm_power_dBm_v3.dat']);
 
 % load SRTM DEM
 dem_path = '../dat/dem/';
@@ -130,7 +134,7 @@ L1_dict_name = '../dat/L1_Dict/L1_Dict_v2_3.xlsx';      % L1 dictionary updated
 %% get post-calibrated L1 product
 clc
 
-for k = 2
+for k = 1:2
 
     filename = L0_filenames(k).name;
     path = L0_filenames(k).folder;
@@ -138,7 +142,7 @@ for k = 2
     L0_filename = [path '/' filename];
 
     L1_postCal = get_L1_product(L0_filename, ...
-                                L1a_cal_ddm_counts,L1a_cal_ddm_power, ...
+                                L1a_cal_ddm_counts_dB,L1a_cal_ddm_power_dBm, ...
                                 dem,dtu10,landmask_nz,lcv_mask,water_mask, ...
                                 SV_PRN_LUT,SV_eirp_LUT, ...
                                 LHCP_pattern,RHCP_pattern, ...

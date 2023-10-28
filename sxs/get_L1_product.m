@@ -1,8 +1,10 @@
 %This function solves all L1 variables and packets as a structure for
 % processing multiple L0 files
-% Algorithm version 2.3
+% Algorithm version 2.4 - 29 Oct
 % L1 dictionary version 2.3
-% all yaw updated to heading
+% 1. Reverse back to orignal L1a calibration curve with new power factor
+% 2. Update quality flag sequence to LSB
+% 3. Update algorithm version number
 
 function L1_postCal = get_L1_product(   L0_filename, ...
                                         L1a_cal_ddm_counts,L1a_cal_ddm_power, ...
@@ -409,7 +411,7 @@ L1_postCal.dem_source = 'SRTM30-200m';
 
 % write algorithm and LUT versions
 % version numbers may change when updating a LUT
-L1_postCal.l1_algorithm_version = '2.3';        % 22 July, algorithm change
+L1_postCal.l1_algorithm_version = '2.4';        % 28 Oct, L1a algorithm change
 L1_postCal.l1_data_version = '2.3';             % 22 July, L1 dictionary change
 L1_postCal.l1a_sig_LUT_version = '1';
 L1_postCal.l1a_noise_LUT_version = '1';
@@ -1224,12 +1226,18 @@ for i = 1:I
             ANZ_port1 = get_ANZ_port(rf_source1);
             ddm_power_counts1 = raw_counts1*first_scale_factor1;
 
-            noise_floor1 = [noise_floor_LHCP,noise_floor_RHCP];
+            % reverse back to original calibration table - 28 Oct
+            %noise_floor1 = [noise_floor_LHCP,noise_floor_RHCP];
 
             % perform L1a calibration from Counts to Watts
             % function update for this step 27-June
-            ddm_power_watts1 = L1a_counts2watts2(ddm_power_counts1,ANZ_port1, ...
-                L1a_cal_ddm_counts,L1a_cal_ddm_power,std_dev1,noise_floor1);
+            %ddm_power_watts1 = L1a_counts2watts2(ddm_power_counts1,ANZ_port1, ...
+            %    L1a_cal_ddm_counts,L1a_cal_ddm_power,std_dev1,noise_floor1);
+
+            % perform L1a calibration from Counts to Watts
+            % reverse back - 28 Oct
+            ddm_power_watts1 = L1a_counts2watts(ddm_power_counts1,ANZ_port1, ...
+                L1a_cal_ddm_counts,L1a_cal_ddm_power,std_dev1);
 
             % peak counts and power watts for instrument gain
             peak_counts1 = max(max(ddm_power_counts1));
